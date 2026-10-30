@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { verifyAdminPin } from '@/lib/auth';
+import { verifyAdminPassword, getAdminPasswordHeader } from '@/lib/auth';
 import { testDiscordWebhook } from '@/lib/discord';
 
 export async function POST(request: Request) {
   try {
-    const pin = request.headers.get('x-admin-pin');
-    if (!verifyAdminPin(pin)) {
-      return NextResponse.json({ error: 'Brak uprawnień (niepoprawny PIN).' }, { status: 401 });
+    const password = getAdminPasswordHeader(request);
+    if (!verifyAdminPassword(password)) {
+      return NextResponse.json({ error: 'Brak uprawnień (niepoprawne hasło).' }, { status: 401 });
     }
 
     const { webhookUrl } = await request.json();

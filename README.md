@@ -44,7 +44,7 @@ Lekka, szybka aplikacja webowa stworzona specjalnie dla graczy i kolekcjonerów 
   * Sortowanie: Cena (najwyższa / najniższa), Nazwa (A-Z / Z-A), Rzadkość (od mitycznych), Najnowsze.
   * Filtrowanie w panelu magazynu administratora (`/admin`) po dodatku, rzadkości, wersji foil i stanie magazynowym.
 * **Panel Administratora (`/admin`)**:
-  * Zabezpieczony kodem PIN (domyślny: `1234`, zmienny w ustawieniach).
+  * Zabezpieczony hasłem (domyślne: `haslo`, zmienne w ustawieniach).
   * Zarządzanie zamówieniami: oznaczanie jako odebrane lub anulowanie (anulowanie automatycznie zwraca karty do magazynu).
   * Ręczne dodawanie pojedynczych kart z podpowiedzią na żywo ze Scryfall.
   * Wbudowany generator i drukowanie kodu QR.

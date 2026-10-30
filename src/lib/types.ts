@@ -51,7 +51,8 @@ export interface Settings {
   pickup_days: string;
   discord_webhook: string;
   eur_to_pln: string;
-  admin_pin: string;
+  admin_password?: string;
+  admin_pin?: string;
 }
 
 export interface PublicSettings {

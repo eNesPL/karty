@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { verifyAdminPin } from '@/lib/auth';
+import { verifyAdminPassword, getAdminPasswordHeader } from '@/lib/auth';
 import { Reservation, ReservationItem } from '@/lib/types';
 
 export async function PATCH(
@@ -8,9 +8,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const pin = request.headers.get('x-admin-pin');
-    if (!verifyAdminPin(pin)) {
-      return NextResponse.json({ error: 'Brak uprawnień (niepoprawny PIN).' }, { status: 401 });
+    const password = getAdminPasswordHeader(request);
+    if (!verifyAdminPassword(password)) {
+      return NextResponse.json({ error: 'Brak uprawnień (niepoprawne hasło).' }, { status: 401 });
     }
 
     const { id } = await params;

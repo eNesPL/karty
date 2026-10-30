@@ -31,7 +31,7 @@ import { BuylistBulkPreviewItem } from '@/lib/buylist_bulk';
 import Link from 'next/link';
 
 export default function AdminPage() {
-  const [pin, setPin] = useState('');
+  const [password, setPassword] = useState('');
   const [isAuth, setIsAuth] = useState(false);
   const [authError, setAuthError] = useState('');
   const [activeTab, setActiveTab] = useState<'reservations' | 'inventory' | 'buylist' | 'buylist_offers' | 'import' | 'settings'>('reservations');
@@ -128,7 +128,8 @@ export default function AdminPage() {
     pickup_days: '',
     discord_webhook: '',
     eur_to_pln: '4.30',
-    admin_pin: '1234',
+    admin_password: 'haslo',
+    admin_pin: 'haslo',
   });
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState('');
@@ -138,29 +139,29 @@ export default function AdminPage() {
   const [qrUrl, setQrUrl] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState('');
 
-  // Check saved PIN on mount
+  // Check saved password on mount
   useEffect(() => {
-    const savedPin = localStorage.getItem('mtg_admin_pin');
-    if (savedPin) {
-      setPin(savedPin);
-      verifyPin(savedPin);
+    const savedPass = localStorage.getItem('mtg_admin_password') || localStorage.getItem('mtg_admin_pin');
+    if (savedPass) {
+      setPassword(savedPass);
+      verifyPassword(savedPass);
     }
   }, []);
 
-  const verifyPin = async (inputPin: string) => {
+  const verifyPassword = async (inputPassword: string) => {
     setAuthError('');
     try {
       const res = await fetch('/api/admin/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: inputPin }),
+        body: JSON.stringify({ password: inputPassword, pin: inputPassword }),
       });
       if (res.ok) {
         setIsAuth(true);
-        localStorage.setItem('mtg_admin_pin', inputPin);
+        localStorage.setItem('mtg_admin_password', inputPassword);
       } else {
         const data = await res.json();
-        setAuthError(data.error || 'Nieprawidłowy PIN.');
+        setAuthError(data.error || 'Nieprawidłowe hasło.');
         setIsAuth(false);
       }
     } catch {
@@ -170,13 +171,14 @@ export default function AdminPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    verifyPin(pin);
+    verifyPassword(password);
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('mtg_admin_password');
     localStorage.removeItem('mtg_admin_pin');
     setIsAuth(false);
-    setPin('');
+    setPassword('');
   };
 
   // Fetch initial data when authenticated
@@ -213,7 +215,7 @@ export default function AdminPage() {
     setResLoading(true);
     try {
       const res = await fetch('/api/admin/reservations', {
-        headers: { 'x-admin-pin': pin },
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
       });
       const data = await res.json();
       if (data.reservations) {
@@ -232,7 +234,7 @@ export default function AdminPage() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password, 'x-admin-pin': password,
         },
         body: JSON.stringify({ status }),
       });
@@ -259,7 +261,7 @@ export default function AdminPage() {
       else if (invStock === 'out_of_stock') params.set('in_stock', 'false');
 
       const res = await fetch(`/api/admin/cards?${params.toString()}`, {
-        headers: { 'x-admin-pin': pin },
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
       });
       const data = await res.json();
       if (data.cards) {
@@ -297,7 +299,7 @@ export default function AdminPage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password, 'x-admin-pin': password,
         },
         body: JSON.stringify({
           price_pln: editingCard.price_pln,
@@ -320,7 +322,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/admin/cards/${id}`, {
         method: 'DELETE',
-        headers: { 'x-admin-pin': pin },
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
       });
       if (res.ok) {
         fetchInventory();
@@ -335,7 +337,7 @@ export default function AdminPage() {
     setBuylistLoading(true);
     try {
       const res = await fetch(`/api/admin/buylist?q=${encodeURIComponent(buylistSearch)}`, {
-        headers: { 'x-admin-pin': pin },
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
       });
       const data = await res.json();
       if (data.cards) {
@@ -357,7 +359,7 @@ export default function AdminPage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password, 'x-admin-pin': password,
         },
         body: JSON.stringify({
           price_pln: editingBuylistCard.price_pln,
@@ -381,7 +383,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/admin/buylist/${id}`, {
         method: 'DELETE',
-        headers: { 'x-admin-pin': pin },
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
       });
       if (res.ok) {
         fetchBuylist();
@@ -399,7 +401,7 @@ export default function AdminPage() {
     setBuyScryfallLoading(true);
     try {
       const res = await fetch(`/api/admin/search-scryfall?q=${encodeURIComponent(buyScryfallQuery)}`, {
-        headers: { 'x-admin-pin': pin },
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
       });
       const data = await res.json();
       setBuyScryfallResults(data.cards || []);
@@ -430,7 +432,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password, 'x-admin-pin': password,
         },
         body: JSON.stringify({
           name: selectedBuyScryfallCard.name,
@@ -469,7 +471,7 @@ export default function AdminPage() {
     setOffersLoading(true);
     try {
       const res = await fetch('/api/admin/buylist/offers', {
-        headers: { 'x-admin-pin': pin },
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
       });
       const data = await res.json();
       if (data.offers) {
@@ -488,7 +490,7 @@ export default function AdminPage() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password, 'x-admin-pin': password,
         },
         body: JSON.stringify({ status }),
       });
@@ -505,7 +507,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/admin/buylist/offers/${id}`, {
         method: 'DELETE',
-        headers: { 'x-admin-pin': pin },
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
       });
       if (res.ok) {
         fetchBuylistOffers();
@@ -560,7 +562,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password, 'x-admin-pin': password,
         },
         body: JSON.stringify({
           action: 'preview',
@@ -601,7 +603,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password, 'x-admin-pin': password,
         },
         body: JSON.stringify({
           action: 'import',
@@ -648,7 +650,7 @@ export default function AdminPage() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password, 'x-admin-pin': password,
         },
         body: JSON.stringify({
           fromCondition: from,
@@ -682,7 +684,7 @@ export default function AdminPage() {
     setScryfallLoading(true);
     try {
       const res = await fetch(`/api/admin/search-scryfall?q=${encodeURIComponent(scryfallQuery)}`, {
-        headers: { 'x-admin-pin': pin },
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
       });
       const data = await res.json();
       setScryfallResults(data.cards || []);
@@ -712,7 +714,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password, 'x-admin-pin': password,
         },
         body: JSON.stringify({
           name: selectedScryfallCard.name,
@@ -786,7 +788,7 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password, 'x-admin-pin': password,
         },
         body: JSON.stringify({
           csvContent: content,
@@ -813,7 +815,7 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password, 'x-admin-pin': password,
         },
         body: JSON.stringify({
           csvContent,
@@ -843,17 +845,19 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
   const fetchAdminSettings = async () => {
     try {
       const res = await fetch('/api/admin/settings', {
-        headers: { 'x-admin-pin': pin },
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
       });
       const data = await res.json();
       if (data.settings) {
+        const pass = data.settings.admin_password || data.settings.admin_pin || 'haslo';
         setSettings({
           store_title: data.settings.store_title || '',
           store_subtitle: data.settings.store_subtitle || '',
           pickup_days: data.settings.pickup_days || '',
           discord_webhook: data.settings.discord_webhook || '',
           eur_to_pln: data.settings.eur_to_pln || '4.30',
-          admin_pin: data.settings.admin_pin || '1234',
+          admin_password: pass,
+          admin_pin: pass,
         });
         setEurRateInput(data.settings.eur_to_pln || '4.30');
       }
@@ -871,15 +875,17 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password,
+          'x-admin-pin': password,
         },
         body: JSON.stringify({ settings }),
       });
       if (res.ok) {
         setSettingsMessage('Ustawienia zapisane pomyślnie!');
-        if (settings.admin_pin !== pin) {
-          setPin(settings.admin_pin);
-          localStorage.setItem('mtg_admin_pin', settings.admin_pin);
+        const updatedPass = settings.admin_password || settings.admin_pin;
+        if (updatedPass && updatedPass !== password) {
+          setPassword(updatedPass);
+          localStorage.setItem('mtg_admin_password', updatedPass);
         }
       }
     } catch {
@@ -896,7 +902,7 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': pin,
+          'x-admin-password': password, 'x-admin-pin': password,
         },
         body: JSON.stringify({ webhookUrl: settings.discord_webhook }),
       });
@@ -911,7 +917,7 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
     }
   };
 
-  // If not authenticated, render PIN prompt
+  // If not authenticated, render password prompt
   if (!isAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-slate-100">
@@ -921,7 +927,7 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
           </div>
           <h2 className="mt-4 text-center text-lg font-bold text-white">Panel Administratora</h2>
           <p className="mt-1 text-center text-xs text-slate-400">
-            Wpisz kod PIN, aby zarządzać kartami i rezerwacjami. Domyślny PIN: <code className="text-amber-400 font-bold">1234</code>
+            Wpisz hasło, aby zarządzać kartami i rezerwacjami. Domyślne hasło: <code className="text-amber-400 font-bold">haslo</code>
           </p>
 
           <form onSubmit={handleLogin} className="mt-5 space-y-3">
@@ -932,10 +938,10 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
             )}
             <input
               type="password"
-              placeholder="Kod PIN"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 text-center text-lg font-bold tracking-widest text-white focus:border-amber-500 focus:outline-none"
+              placeholder="Hasło"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-center text-base font-semibold text-white focus:border-amber-500 focus:outline-none"
               autoFocus
             />
             <button
@@ -2190,16 +2196,17 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
                 />
               </div>
 
-              {/* Admin PIN */}
+              {/* Admin Password */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Kod PIN do Panelu Admina
+                  Hasło do Panelu Admina
                 </label>
                 <input
                   type="password"
-                  value={settings.admin_pin}
-                  onChange={(e) => setSettings({ ...settings, admin_pin: e.target.value })}
-                  className="w-32 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-amber-500 focus:outline-none"
+                  value={settings.admin_password || settings.admin_pin || ''}
+                  onChange={(e) => setSettings({ ...settings, admin_password: e.target.value, admin_pin: e.target.value })}
+                  placeholder="Hasło..."
+                  className="w-48 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-amber-500 focus:outline-none"
                 />
               </div>
 

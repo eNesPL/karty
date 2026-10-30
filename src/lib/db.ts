@@ -204,17 +204,29 @@ export function getDb(): DatabaseSync {
     pickup_days: 'Wtorek (turniej),Czwartek (commander)',
     discord_webhook: '',
     eur_to_pln: '4.30',
-    admin_pin: '1234',
+    admin_password: 'haslo',
+    admin_pin: 'haslo',
   };
 
   const getSettingStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
   const insertSettingStmt = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
+  const updateSettingStmt = db.prepare('UPDATE settings SET value = ? WHERE key = ?');
 
   for (const [key, value] of Object.entries(defaultSettings)) {
     const existing = getSettingStmt.get(key) as { value: string } | undefined;
     if (!existing) {
       insertSettingStmt.run(key, value);
     }
+  }
+
+  // If old default '1234' is still set in admin_pin or admin_password, migrate to 'haslo'
+  const oldPin = getSettingStmt.get('admin_pin') as { value: string } | undefined;
+  if (oldPin?.value === '1234') {
+    updateSettingStmt.run('haslo', 'admin_pin');
+  }
+  const oldPass = getSettingStmt.get('admin_password') as { value: string } | undefined;
+  if (oldPass?.value === '1234') {
+    updateSettingStmt.run('haslo', 'admin_password');
   }
 
   dbInstance = db;

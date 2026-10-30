@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { verifyAdminPin } from '@/lib/auth';
+import { verifyAdminPassword, getAdminPasswordHeader } from '@/lib/auth';
 
 export async function GET(request: Request) {
   try {
-    const pin = request.headers.get('x-admin-pin');
-    if (!verifyAdminPin(pin)) {
-      return NextResponse.json({ error: 'Brak uprawnień (niepoprawny PIN).' }, { status: 401 });
+    const password = getAdminPasswordHeader(request);
+    if (!verifyAdminPassword(password)) {
+      return NextResponse.json({ error: 'Brak uprawnień (niepoprawne hasło).' }, { status: 401 });
     }
 
     const db = getDb();
@@ -20,6 +20,13 @@ export async function GET(request: Request) {
       settings[row.key] = row.value;
     }
 
+    if (!settings.admin_password && settings.admin_pin) {
+      settings.admin_password = settings.admin_pin;
+    }
+    if (!settings.admin_pin && settings.admin_password) {
+      settings.admin_pin = settings.admin_password;
+    }
+
     return NextResponse.json({ settings });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -29,9 +36,9 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const pin = request.headers.get('x-admin-pin');
-    if (!verifyAdminPin(pin)) {
-      return NextResponse.json({ error: 'Brak uprawnień (niepoprawny PIN).' }, { status: 401 });
+    const password = getAdminPasswordHeader(request);
+    if (!verifyAdminPassword(password)) {
+      return NextResponse.json({ error: 'Brak uprawnień (niepoprawne hasło).' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -46,6 +53,13 @@ export async function PUT(request: Request) {
       INSERT INTO settings (key, value) VALUES (?, ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
     `);
+
+    // Sync admin_password and admin_pin
+    if (settings.admin_password) {
+      settings.admin_pin = settings.admin_password;
+    } else if (settings.admin_pin) {
+      settings.admin_password = settings.admin_pin;
+    }
 
     for (const [key, value] of Object.entries(settings)) {
       upsertStmt.run(key, String(value));

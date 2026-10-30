@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { verifyAdminPin } from '@/lib/auth';
+import { verifyAdminPassword } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
-    const { pin } = await request.json();
-    if (!verifyAdminPin(pin)) {
-      return NextResponse.json({ error: 'Nieprawidłowy kod PIN.' }, { status: 401 });
+    const body = await request.json();
+    const password = body.password || body.pin;
+    if (!verifyAdminPassword(password)) {
+      return NextResponse.json({ error: 'Nieprawidłowe hasło.' }, { status: 401 });
     }
 
     return NextResponse.json({ success: true, message: 'Autoryzacja udana.' });
