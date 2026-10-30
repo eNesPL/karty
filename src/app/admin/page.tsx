@@ -2177,9 +2177,12 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
                   type="text"
                   value={settings.pickup_days}
                   onChange={(e) => setSettings({ ...settings, pickup_days: e.target.value })}
-                  placeholder="np. Wtorek (turniej),Czwartek (commander)"
+                  placeholder="np. Wtorek (turniej), Czwartek (commander)"
                   className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:border-amber-500 focus:outline-none"
                 />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Dni pojawią się jako przyciski wyboru w koszyku rezerwacji oraz formularzu skupu (np. <code className="text-amber-400 font-mono">Wtorek, Czwartek, Sobota</code>).
+                </p>
               </div>
 
               {/* EUR/PLN Rate */}

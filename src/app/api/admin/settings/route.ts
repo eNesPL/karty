@@ -1,8 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, connection } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getDb } from '@/lib/db';
 import { verifyAdminPassword, getAdminPasswordHeader } from '@/lib/auth';
 
 export async function GET(request: Request) {
+  await connection();
   try {
     const password = getAdminPasswordHeader(request);
     if (!verifyAdminPassword(password)) {
@@ -63,6 +65,13 @@ export async function PUT(request: Request) {
 
     for (const [key, value] of Object.entries(settings)) {
       upsertStmt.run(key, String(value));
+    }
+
+    try {
+      revalidatePath('/', 'layout');
+      revalidatePath('/api/settings');
+    } catch (e) {
+      console.warn('revalidatePath warning:', e);
     }
 
     return NextResponse.json({ success: true, message: 'Ustawienia zapisane.' });

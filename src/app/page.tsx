@@ -120,14 +120,26 @@ export default function CatalogPage() {
   const [previewCard, setPreviewCard] = useState<Card | BuylistCard | null>(null);
 
   // Fetch settings
-  useEffect(() => {
-    fetch('/api/settings')
+  const fetchSettings = useCallback(() => {
+    fetch('/api/settings', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
-        if (data.store_title) setSettings(data);
+        if (data && Array.isArray(data.pickup_days)) {
+          setSettings(data);
+        }
       })
       .catch((err) => console.error('Error fetching settings:', err));
   }, []);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  useEffect(() => {
+    if (isCartOpen || isBuylistOfferOpen) {
+      fetchSettings();
+    }
+  }, [isCartOpen, isBuylistOfferOpen, fetchSettings]);
 
   // Fetch cards (Sell inventory)
   const fetchCards = useCallback(async () => {

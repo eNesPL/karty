@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BuylistCard } from '@/lib/types';
 import { X, Trash2, Plus, Minus, CheckCircle, Calendar, Sparkles, HandCoins } from 'lucide-react';
 
@@ -40,6 +40,13 @@ export function BuylistOfferDrawer({
   const [sellerContact, setSellerContact] = useState('');
   const [meetingDay, setMeetingDay] = useState(pickupDays[0] || 'Wtorek');
   const [notes, setNotes] = useState('');
+
+  // Keep meetingDay in sync with pickupDays whenever prop changes or drawer opens
+  useEffect(() => {
+    if (pickupDays.length > 0 && (!meetingDay || !pickupDays.includes(meetingDay))) {
+      setMeetingDay(pickupDays[0]);
+    }
+  }, [pickupDays, meetingDay, isOpen]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -324,13 +331,13 @@ export function BuylistOfferDrawer({
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Kiedy przyniesiesz karty? <span className="text-sky-400">*</span>
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-wrap gap-2">
                   {pickupDays.map((day) => (
                     <button
                       key={day}
                       type="button"
                       onClick={() => setMeetingDay(day)}
-                      className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                      className={`flex-1 min-w-[130px] flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition ${
                         meetingDay === day
                           ? 'border-sky-500 bg-sky-500/10 text-sky-300 font-bold'
                           : 'border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-700'
