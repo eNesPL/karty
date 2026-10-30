@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MTG Klaser & Rezerwacje 🃏
 
-## Getting Started
+Lekka, szybka aplikacja webowa stworzona specjalnie dla graczy i kolekcjonerów *Magic: The Gathering*, którzy chcą wystawiać swoje karty z cenami i umożliwić znajomym/klientom **rezerwację na konkretny dzień gry (np. wtorek / czwartek) za pomocą kodu QR**.
 
-First, run the development server:
+---
+
+## 🚀 Jak to działa?
+
+1. **Naklejasz Kod QR na swój deckbox lub klaser** (kod generuje się w panelu admina jednym kliknięciem).
+2. Gracz na turnieju skanuje kod telefonem → otwiera się mobilny katalog Twoich kart.
+3. Wybiera karty, wpisuje swój nick, kontakt i wybiera dzień odbioru (*Wtorek (turniej)* lub *Czwartek (commander)*).
+4. Kliknięcie „Potwierdź rezerwację”:
+   - Karta zostaje automatycznie zarezerwowana (stan magazynowy pomniejsza się o wybraną ilość, nikt inny jej nie podkradnie).
+   - Otrzymujesz natychmiastowe powiadomienie na swój prywatny kanał **Discord** (bogaty embed z listą kart, zdjęciem, łączną kwotą i kontaktem do gracza).
+
+---
+
+## 🛠️ Funkcje
+
+* **Eksport i Import z ManaBox (CSV)**:
+  * Wgrywasz plik `.csv` wyeksportowany prosto z aplikacji ManaBox.
+  * Karty automatycznie otrzymują oficjalne zdjęcia w wysokiej rozdzielczości ze Scryfall CDN.
+  * Opcje cenowe: zachowanie cen z ManaBoxa, pobranie świeżych cen Cardmarket EUR ze Scryfall (z przelicznikiem EUR → PLN) lub stała cena.
+* **Wyszukiwarka i zaawansowane filtry**:
+  * Szukanie po nazwie, dodatku lub typie.
+  * Filtry kolorów: Biały {W}, Niebieski {U}, Czarny {B}, Czerwony {R}, Zielony {G}, Wielokolorowe {M}, Bezbarwne {C}.
+  * Filtr wersji Foil ✨ i sortowanie cenowe.
+* **Panel Administratora (`/admin`)**:
+  * Zabezpieczony kodem PIN (domyślny: `1234`, zmienny w ustawieniach).
+  * Zarządzanie zamówieniami: oznaczanie jako odebrane lub anulowanie (anulowanie automatycznie zwraca karty do magazynu).
+  * Ręczne dodawanie pojedynczych kart z podpowiedzią na żywo ze Scryfall.
+  * Wbudowany generator i drukowanie kodu QR.
+  * Konfiguracja webhooka Discord z przyciskiem testowym.
+
+---
+
+## 🏃 Uruchomienie lokalne
+
+Aplikacja jest już w pełni zbudowana w Twoim katalogu.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+# Uruchomienie serwera produkcyjnego:
+pnpm start
+
+# Albo w trybie deweloperskim:
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Aplikacja wystartuje pod adresem:
+* **Lokalnie:** `http://localhost:3000`
+* **W Twojej sieci Wi-Fi (dostępna z telefonu):** np. `http://192.168.1.X:3000` (dokładny adres wyświetli się w konsoli po uruchomieniu).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📱 Dostęp z telefonu na turnieju (Wdrożenie w 2 minuty)
 
-## Learn More
+Aby kod QR działał z dowolnego telefonu bez bycia w tym samym Wi-Fi, możesz wdrożyć tę aplikację całkowicie za darmo:
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Vercel / Render / Railway / VPS**:
+   * Projekt to standardowy **Next.js (App Router)** z bazą danych w SQLite (`data/karty.db`).
+   * Jeśli wrzucasz na VPS lub Render/Railway z dyskiem persistent: wystarczy `pnpm build && pnpm start`.
+   * Jeśli używasz darmowego tunelu do testów na żywo: możesz użyć np. `ngrok http 3000` lub `cloudflared tunnel`.
