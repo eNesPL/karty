@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { BuylistCard } from '@/lib/types';
-import { Plus, Minus, Sparkles, Eye, HandCoins, Info } from 'lucide-react';
+import { Plus, Minus, Sparkles, Eye, HandCoins } from 'lucide-react';
 
 interface BuylistCardItemProps {
   card: BuylistCard;
@@ -20,12 +20,6 @@ export function BuylistCardItem({
   onPreview,
 }: BuylistCardItemProps) {
   const isMaxInOffer = offerQuantity >= card.quantity;
-
-  const getFoilLabel = (foil: number) => {
-    if (foil === 1) return 'Tylko Foil ✨';
-    if (foil === 0) return 'Tylko Non-foil';
-    return 'Foil lub Normal';
-  };
 
   return (
     <div className="group relative flex flex-col justify-between rounded-xl border border-sky-900/60 bg-slate-900/90 p-3 shadow-md transition-all hover:border-sky-500/50 hover:shadow-xl">

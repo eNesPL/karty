@@ -24,6 +24,7 @@ import {
   AlertCircle,
   FileSpreadsheet,
   HandCoins,
+  RotateCcw,
 } from 'lucide-react';
 import { Card, Reservation, BuylistCard, BuylistOffer } from '@/lib/types';
 import Link from 'next/link';
@@ -65,6 +66,10 @@ export default function AdminPage() {
   // Inventory state
   const [cards, setCards] = useState<Card[]>([]);
   const [invSearch, setInvSearch] = useState('');
+  const [invSet, setInvSet] = useState('');
+  const [invRarity, setInvRarity] = useState('');
+  const [invFoil, setInvFoil] = useState<'all' | 'foil' | 'non_foil'>('all');
+  const [invStock, setInvStock] = useState<'all' | 'in_stock' | 'out_of_stock'>('all');
   const [invLoading, setInvLoading] = useState(false);
   const [editingCard, setEditingCard] = useState<Card | null>(null);
 
@@ -226,7 +231,16 @@ export default function AdminPage() {
   const fetchInventory = async () => {
     setInvLoading(true);
     try {
-      const res = await fetch(`/api/admin/cards?q=${encodeURIComponent(invSearch)}`, {
+      const params = new URLSearchParams();
+      if (invSearch.trim()) params.set('q', invSearch.trim());
+      if (invSet) params.set('set', invSet);
+      if (invRarity) params.set('rarity', invRarity);
+      if (invFoil === 'foil') params.set('foil', 'true');
+      else if (invFoil === 'non_foil') params.set('foil', 'false');
+      if (invStock === 'in_stock') params.set('in_stock', 'true');
+      else if (invStock === 'out_of_stock') params.set('in_stock', 'false');
+
+      const res = await fetch(`/api/admin/cards?${params.toString()}`, {
         headers: { 'x-admin-pin': pin },
       });
       const data = await res.json();
@@ -239,6 +253,22 @@ export default function AdminPage() {
       setInvLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!isAuth) return;
+    const timer = setTimeout(() => {
+      fetchInventory();
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [invSearch, invSet, invRarity, invFoil, invStock, isAuth]);
+
+  useEffect(() => {
+    if (!isAuth) return;
+    const timer = setTimeout(() => {
+      fetchBuylist();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [buylistSearch, isAuth]);
 
   const handleUpdateCard = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1137,17 +1167,72 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
               </div>
             </div>
 
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute top-2.5 left-3 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Szukaj w magazynie..."
-                value={invSearch}
-                onChange={(e) => setInvSearch(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchInventory()}
-                className="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pr-4 pl-9 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none"
-              />
+            {/* Search and Filters Bar */}
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="absolute top-2.5 left-3 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Szukaj po nazwie, dodatku lub typie..."
+                  value={invSearch}
+                  onChange={(e) => setInvSearch(e.target.value)}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-900 py-2 pr-4 pl-9 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {/* Rarity */}
+                <select
+                  value={invRarity}
+                  onChange={(e) => setInvRarity(e.target.value)}
+                  className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="">Rzadkość: Wszystkie</option>
+                  <option value="mythic">Mityczna (Mythic)</option>
+                  <option value="rare">Rzadka (Rare)</option>
+                  <option value="uncommon">Niezwykła (Uncommon)</option>
+                  <option value="common">Zwykła (Common)</option>
+                </select>
+
+                {/* Foil */}
+                <select
+                  value={invFoil}
+                  onChange={(e) => setInvFoil(e.target.value as any)}
+                  className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">Wersja: Wszystkie</option>
+                  <option value="foil">✨ Tylko Foil</option>
+                  <option value="non_foil">Zwykła (Non-foil)</option>
+                </select>
+
+                {/* Stock status */}
+                <select
+                  value={invStock}
+                  onChange={(e) => setInvStock(e.target.value as any)}
+                  className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">Stan: Wszystkie</option>
+                  <option value="in_stock">Tylko na stanie (&gt;0)</option>
+                  <option value="out_of_stock">Brak na stanie (=0)</option>
+                </select>
+
+                {/* Reset button */}
+                {(invSearch || invSet || invRarity || invFoil !== 'all' || invStock !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setInvSearch('');
+                      setInvSet('');
+                      setInvRarity('');
+                      setInvFoil('all');
+                      setInvStock('all');
+                    }}
+                    className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-amber-400 hover:text-amber-300 hover:border-slate-700 transition ml-auto"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Wyczyść filtry
+                  </button>
+                )}
+              </div>
             </div>
 
             {invLoading ? (
@@ -2337,6 +2422,295 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* ================= MODAL: ADD CARD TO BUYLIST VIA SCRYFALL ================= */}
+      {isAddBuylistModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-sky-900/60 bg-slate-900 p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <HandCoins className="h-4 w-4 text-sky-400" />
+                Dodaj poszukiwaną kartę do Skupu
+              </h3>
+              <button
+                onClick={() => {
+                  setIsAddBuylistModalOpen(false);
+                  setSelectedBuyScryfallCard(null);
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Search Scryfall */}
+            <form onSubmit={handleBuyScryfallSearch} className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Wpisz nazwę poszukiwanej karty (np. Bowmasters, Grief, Sheoldred...)"
+                value={buyScryfallQuery}
+                onChange={(e) => setBuyScryfallQuery(e.target.value)}
+                className="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white focus:border-sky-500 focus:outline-none"
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-500"
+              >
+                Szukaj
+              </button>
+            </form>
+
+            {buyScryfallLoading && (
+              <div className="py-6 text-center text-xs text-slate-400">
+                Pobieranie wyników ze Scryfall...
+              </div>
+            )}
+
+            {/* Results */}
+            {!selectedBuyScryfallCard && buyScryfallResults.length > 0 && (
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {buyScryfallResults.map((card) => (
+                  <div
+                    key={card.id}
+                    onClick={() => handleSelectBuyScryfallCard(card)}
+                    className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 p-2 hover:border-sky-500 cursor-pointer transition"
+                  >
+                    <img
+                      src={card.image_url}
+                      alt={card.name}
+                      className="h-12 w-9 rounded object-cover"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-slate-100 truncate">{card.name}</div>
+                      <div className="text-[10px] text-slate-400">
+                        {card.set_name} ({card.set?.toUpperCase()} #{card.collector_number})
+                      </div>
+                    </div>
+                    {card.prices?.eur && (
+                      <div className="text-xs font-semibold text-sky-400">
+                        ~{card.prices.eur} €
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Selected card configuration */}
+            {selectedBuyScryfallCard && (
+              <div className="rounded-xl border border-sky-500/40 bg-slate-950 p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={selectedBuyScryfallCard.image_url}
+                    alt={selectedBuyScryfallCard.name}
+                    className="h-16 w-11 rounded object-cover"
+                  />
+                  <div>
+                    <div className="text-sm font-bold text-white">{selectedBuyScryfallCard.name}</div>
+                    <div className="text-xs text-slate-400">
+                      {selectedBuyScryfallCard.set_name} ({selectedBuyScryfallCard.set?.toUpperCase()} #{selectedBuyScryfallCard.collector_number})
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBuyScryfallCard(null)}
+                      className="text-[11px] text-sky-400 hover:underline mt-1 block"
+                    >
+                      ← Wybierz inne wydanie
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Oferowana cena skupu (PLN)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={newBuyPrice}
+                      onChange={(e) => setNewBuyPrice(e.target.value)}
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Ilość sztuk, którą chcesz kupić</label>
+                    <input
+                      type="number"
+                      value={newBuyQty}
+                      onChange={(e) => setNewBuyQty(e.target.value)}
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Minimalny stan</label>
+                    <select
+                      value={newBuyMinCondition}
+                      onChange={(e) => setNewBuyMinCondition(e.target.value)}
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-white"
+                    >
+                      <option value="LP">Min. LP (Lightly Played / Excellent)</option>
+                      <option value="NM">Tylko NM (Near Mint)</option>
+                      <option value="MP">Min. MP (Played)</option>
+                      <option value="ANY">Dowolny stan</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Wymóg wersji</label>
+                    <select
+                      value={newBuyFoil}
+                      onChange={(e) => setNewBuyFoil(e.target.value)}
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-white"
+                    >
+                      <option value="2">Dowolna (Foil lub Non-foil)</option>
+                      <option value="0">Tylko Non-foil</option>
+                      <option value="1">Tylko Foil ✨</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Uwagi do skupu (opcjonalnie)</label>
+                    <input
+                      type="text"
+                      placeholder="np. chętnie wezmę cały playset, wersja z retro ramką"
+                      value={newBuyNotes}
+                      onChange={(e) => setNewBuyNotes(e.target.value)}
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveNewBuylistCard}
+                  className="w-full rounded-xl bg-sky-600 py-2.5 font-bold text-xs text-white hover:bg-sky-500 transition shadow-lg shadow-sky-600/20"
+                >
+                  Dodaj do listy skupu
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: EDIT BUYLIST CARD ================= */}
+      {editingBuylistCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-sky-900/60 bg-slate-900 p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white truncate">
+                Edycja w skupie: {editingBuylistCard.name}
+              </h3>
+              <button
+                onClick={() => setEditingBuylistCard(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateBuylistCard} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Oferowana cena (PLN)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={editingBuylistCard.price_pln}
+                    onChange={(e) =>
+                      setEditingBuylistCard({
+                        ...editingBuylistCard,
+                        price_pln: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Poszukiwana ilość</label>
+                  <input
+                    type="number"
+                    value={editingBuylistCard.quantity}
+                    onChange={(e) =>
+                      setEditingBuylistCard({
+                        ...editingBuylistCard,
+                        quantity: parseInt(e.target.value, 10) || 0,
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Minimalny stan</label>
+                  <select
+                    value={editingBuylistCard.min_condition}
+                    onChange={(e) =>
+                      setEditingBuylistCard({
+                        ...editingBuylistCard,
+                        min_condition: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-white"
+                  >
+                    <option value="LP">Min. LP</option>
+                    <option value="NM">Tylko NM</option>
+                    <option value="MP">Min. MP</option>
+                    <option value="ANY">Dowolny stan</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Wymóg Foil</label>
+                  <select
+                    value={editingBuylistCard.foil}
+                    onChange={(e) =>
+                      setEditingBuylistCard({
+                        ...editingBuylistCard,
+                        foil: parseInt(e.target.value, 10),
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-white"
+                  >
+                    <option value={2}>Dowolna (Foil lub Non-foil)</option>
+                    <option value={0}>Tylko Non-foil</option>
+                    <option value={1}>Tylko Foil ✨</option>
+                  </select>
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Uwagi</label>
+                  <input
+                    type="text"
+                    value={editingBuylistCard.notes || ''}
+                    onChange={(e) =>
+                      setEditingBuylistCard({
+                        ...editingBuylistCard,
+                        notes: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingBuylistCard(null)}
+                  className="rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+                >
+                  Anuluj
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-sky-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-sky-500"
+                >
+                  Zapisz zmiany
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

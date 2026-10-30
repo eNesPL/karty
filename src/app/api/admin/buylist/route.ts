@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const q = searchParams.get('q')?.trim().toLowerCase() || '';
 
     let sql = 'SELECT * FROM buylist_cards';
-    const params: any[] = [];
+    const params: string[] = [];
 
     if (q) {
       sql += ' WHERE LOWER(name) LIKE ? OR LOWER(set_name) LIKE ? OR LOWER(set_code) LIKE ?';

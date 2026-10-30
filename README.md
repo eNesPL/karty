@@ -21,6 +21,10 @@ Lekka, szybka aplikacja webowa stworzona specjalnie dla graczy i kolekcjonerów 
   * Wgrywasz plik `.csv` wyeksportowany prosto z aplikacji ManaBox.
   * Karty automatycznie otrzymują oficjalne zdjęcia w wysokiej rozdzielczości ze Scryfall CDN.
   * Opcje cenowe: zachowanie cen z ManaBoxa, pobranie świeżych cen Cardmarket EUR ze Scryfall (z przelicznikiem EUR → PLN) lub stała cena.
+* **Skup Kart (Buylist / „Kupię / Poszukuję”)**:
+  * Nowa zakładka na stronie głównej dla graczy: mogą zobaczyć, jakie karty chcesz od nich kupić na turnieju i ile za nie płacisz (w PLN).
+  * Przycisk „Mam tę kartę”: gracz wybiera ilość, stan i wersję foil, wpisuje nick i termin spotkania, a Ty otrzymujesz natychmiastowe powiadomienie na Discord.
+  * W panelu admina (`/admin`): dedykowana zakładka do wyszukiwania i dodawania kart do skupu ze Scryfall, edycji cen skupu oraz zarządzania otrzymanymi ofertami od graczy.
 * **Wyszukiwarka i zaawansowane filtry**:
   * Szukanie po nazwie, dodatku lub typie.
   * Filtry kolorów: Biały {W}, Niebieski {U}, Czarny {B}, Czerwony {R}, Zielony {G}, Wielokolorowe {M}, Bezbarwne {C}.
