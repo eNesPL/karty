@@ -27,6 +27,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { Card, Reservation, BuylistCard, BuylistOffer } from '@/lib/types';
+import { BuylistBulkPreviewItem } from '@/lib/buylist_bulk';
 import Link from 'next/link';
 
 export default function AdminPage() {
@@ -62,6 +63,23 @@ export default function AdminPage() {
   const [newBuyMinCondition, setNewBuyMinCondition] = useState('LP');
   const [newBuyFoil, setNewBuyFoil] = useState('2');
   const [newBuyNotes, setNewBuyNotes] = useState('');
+
+  // Bulk Buylist import state
+  const [isBulkBuylistModalOpen, setIsBulkBuylistModalOpen] = useState(false);
+  const [bulkBuylistInputType, setBulkBuylistInputType] = useState<'text' | 'csv'>('text');
+  const [bulkBuylistText, setBulkBuylistText] = useState('');
+  const [bulkBuylistCsv, setBulkBuylistCsv] = useState('');
+  const [bulkBuylistCsvFileName, setBulkBuylistCsvFileName] = useState('');
+  const [bulkBuylistPricingMode, setBulkBuylistPricingMode] = useState<'percent' | 'fixed' | 'csv'>('percent');
+  const [bulkBuylistPercentRate, setBulkBuylistPercentRate] = useState('75');
+  const [bulkBuylistFixedPrice, setBulkBuylistFixedPrice] = useState('10.00');
+  const [bulkBuylistMinCondition, setBulkBuylistMinCondition] = useState('LP');
+  const [bulkBuylistFoil, setBulkBuylistFoil] = useState('2');
+  const [bulkBuylistNotes, setBulkBuylistNotes] = useState('');
+  const [bulkBuylistLoading, setBulkBuylistLoading] = useState(false);
+  const [bulkBuylistPreview, setBulkBuylistPreview] = useState<BuylistBulkPreviewItem[] | null>(null);
+  const [bulkBuylistError, setBulkBuylistError] = useState('');
+  const [bulkBuylistResult, setBulkBuylistResult] = useState<string | null>(null);
 
   // Inventory state
   const [cards, setCards] = useState<Card[]>([]);
@@ -495,6 +513,130 @@ export default function AdminPage() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  // Bulk Buylist Handlers
+  const handleLoadSampleBuylistText = () => {
+    const sample = `4 Orcish Bowmasters
+2 Sheoldred, the Apocalypse (DMU) 107
+4 Flooded Strand [MH3]
+1 The One Ring *F*
+2 Force of Will
+4 Lightning Bolt`;
+    setBulkBuylistText(sample);
+    setBulkBuylistError('');
+  };
+
+  const handleBulkBuylistFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBulkBuylistCsvFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      setBulkBuylistCsv(content);
+      setBulkBuylistError('');
+    };
+    reader.readAsText(file);
+  };
+
+  const handleBulkBuylistPreview = async () => {
+    if (bulkBuylistInputType === 'text' && !bulkBuylistText.trim()) {
+      setBulkBuylistError('Wklej listę kart do pola tekstowego.');
+      return;
+    }
+    if (bulkBuylistInputType === 'csv' && !bulkBuylistCsv.trim()) {
+      setBulkBuylistError('Wgraj lub wklej plik CSV.');
+      return;
+    }
+
+    setBulkBuylistLoading(true);
+    setBulkBuylistError('');
+    setBulkBuylistResult(null);
+
+    try {
+      const res = await fetch('/api/admin/buylist/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-pin': pin,
+        },
+        body: JSON.stringify({
+          action: 'preview',
+          text: bulkBuylistInputType === 'text' ? bulkBuylistText : '',
+          csvContent: bulkBuylistInputType === 'csv' ? bulkBuylistCsv : '',
+          pricingMode: bulkBuylistPricingMode,
+          percentRate: parseFloat(bulkBuylistPercentRate) || 75,
+          fixedPrice: parseFloat(bulkBuylistFixedPrice) || 10,
+          eurRate: parseFloat(settings.eur_to_pln || '4.30') || 4.30,
+          defaultMinCondition: bulkBuylistMinCondition,
+          defaultFoil: parseInt(bulkBuylistFoil, 10),
+          defaultNotes: bulkBuylistNotes,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Błąd podczas przetwarzania listy.');
+      }
+
+      setBulkBuylistPreview(data.cards || []);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setBulkBuylistError(msg);
+    } finally {
+      setBulkBuylistLoading(false);
+    }
+  };
+
+  const handleBulkBuylistImport = async () => {
+    if (!bulkBuylistPreview || bulkBuylistPreview.length === 0) return;
+
+    setBulkBuylistLoading(true);
+    setBulkBuylistError('');
+
+    try {
+      const res = await fetch('/api/admin/buylist/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-pin': pin,
+        },
+        body: JSON.stringify({
+          action: 'import',
+          cards: bulkBuylistPreview,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Błąd podczas importu kart do skupu.');
+      }
+
+      setBulkBuylistResult(`Sukces: Dodano ${data.count} kart do listy skupu!`);
+      setBulkBuylistPreview(null);
+      setBulkBuylistText('');
+      setBulkBuylistCsv('');
+      fetchBuylist();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setBulkBuylistError(msg);
+    } finally {
+      setBulkBuylistLoading(false);
+    }
+  };
+
+  const handleUpdatePreviewCardPrice = (index: number, newPrice: number) => {
+    if (!bulkBuylistPreview) return;
+    const updated = [...bulkBuylistPreview];
+    updated[index] = { ...updated[index], price_pln: newPrice };
+    setBulkBuylistPreview(updated);
+  };
+
+  const handleRemovePreviewCard = (index: number) => {
+    if (!bulkBuylistPreview) return;
+    setBulkBuylistPreview(bulkBuylistPreview.filter((_, i) => i !== index));
   };
 
   const handleBulkChangeCondition = async (from = bulkFromCondition, to = bulkToCondition) => {
@@ -1362,10 +1504,23 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
                 <button
                   type="button"
                   onClick={() => setIsAddBuylistModalOpen(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-md transition hover:bg-sky-500"
+                  className="flex items-center gap-1.5 rounded-xl bg-slate-800 border border-slate-700 px-3.5 py-2 text-xs font-bold text-slate-200 shadow-md transition hover:bg-slate-700 hover:text-white"
                 >
-                  <Plus className="h-4 w-4" />
-                  Dodaj kartę do skupu
+                  <Plus className="h-4 w-4 text-sky-400" />
+                  Dodaj pojedynczą kartę
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBulkBuylistModalOpen(true);
+                    setBulkBuylistPreview(null);
+                    setBulkBuylistError('');
+                    setBulkBuylistResult(null);
+                  }}
+                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-sky-600/25 transition hover:from-sky-500 hover:to-blue-500 active:scale-95"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Masowe dodawanie (Lista / CSV)
                 </button>
               </div>
             </div>
@@ -2711,6 +2866,415 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ================= MODAL: BULK BUYLIST IMPORT ================= */}
+      {isBulkBuylistModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-3xl rounded-2xl border border-sky-900/60 bg-slate-900 p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <FileSpreadsheet className="h-5 w-5 text-sky-400" />
+                  Masowe dodawanie kart do skupu (Buylist)
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Wklej całą listę poszukiwanych kart lub wgraj plik CSV. System automatycznie pobierze grafiki i wyceni karty ze Scryfall.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsBulkBuylistModalOpen(false);
+                  setBulkBuylistPreview(null);
+                  setBulkBuylistError('');
+                  setBulkBuylistResult(null);
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            {bulkBuylistResult && (
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-xs text-emerald-300 font-semibold flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 shrink-0" />
+                {bulkBuylistResult}
+              </div>
+            )}
+
+            {bulkBuylistError && (
+              <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                {bulkBuylistError}
+              </div>
+            )}
+
+            {/* If no preview yet, show input form */}
+            {!bulkBuylistPreview ? (
+              <div className="space-y-4">
+                {/* Mode tabs: Text vs CSV */}
+                <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+                  <button
+                    type="button"
+                    onClick={() => setBulkBuylistInputType('text')}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                      bulkBuylistInputType === 'text'
+                        ? 'bg-sky-600 text-white shadow'
+                        : 'bg-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    📝 Wklej listę tekstową (Wantlist / Decklist)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBulkBuylistInputType('csv')}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                      bulkBuylistInputType === 'csv'
+                        ? 'bg-sky-600 text-white shadow'
+                        : 'bg-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    📁 Plik CSV (ManaBox)
+                  </button>
+                </div>
+
+                {/* Text input view */}
+                {bulkBuylistInputType === 'text' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <label className="font-semibold text-slate-300">
+                        Wklej karty (jedna w linijce):
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleLoadSampleBuylistText}
+                        className="text-sky-400 hover:underline text-[11px]"
+                      >
+                        Załaduj przykładową listę (6 kart)
+                      </button>
+                    </div>
+
+                    <textarea
+                      rows={7}
+                      value={bulkBuylistText}
+                      onChange={(e) => setBulkBuylistText(e.target.value)}
+                      placeholder={`np.:\n4 Orcish Bowmasters\n2 Sheoldred, the Apocalypse (DMU) 107\n4 Flooded Strand [MH3]\n1 The One Ring *F*\n2 Force of Will`}
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-white placeholder-slate-600 focus:border-sky-500 focus:outline-none"
+                    />
+
+                    <p className="text-[11px] text-slate-500">
+                      Obsługiwane formaty: <code className="text-slate-400">4 Orcish Bowmasters</code>, <code className="text-slate-400">1x Ragavan (MH2) 138</code>, <code className="text-slate-400">Sol Ring [CMM]</code>, opcjonalnie <code className="text-slate-400">*F*</code> lub <code className="text-slate-400">foil</code>.
+                    </p>
+                  </div>
+                )}
+
+                {/* CSV input view */}
+                {bulkBuylistInputType === 'csv' && (
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/60 p-4 text-center">
+                      <Upload className="h-6 w-6 mx-auto text-sky-400 mb-2" />
+                      <label className="cursor-pointer inline-block rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-500 transition">
+                        Wybierz plik CSV
+                        <input
+                          type="file"
+                          accept=".csv,text/csv"
+                          onChange={handleBulkBuylistFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      {bulkBuylistCsvFileName && (
+                        <div className="mt-2 text-xs font-mono text-sky-300">
+                          Wybrano: {bulkBuylistCsvFileName}
+                        </div>
+                      )}
+                    </div>
+
+                    {bulkBuylistCsv && (
+                      <div>
+                        <div className="text-[11px] text-slate-400 mb-1">Zawartość CSV:</div>
+                        <textarea
+                          rows={4}
+                          value={bulkBuylistCsv}
+                          onChange={(e) => setBulkBuylistCsv(e.target.value)}
+                          className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2 font-mono text-[11px] text-slate-300 focus:border-sky-500 focus:outline-none"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Pricing & Default Settings */}
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-3">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <SettingsIcon className="h-3.5 w-3.5 text-sky-400" />
+                    Ustawienia wyceny i parametrów skupu
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {/* Pricing Mode */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                        Sposób wyceny kart w skupie:
+                      </label>
+                      <select
+                        value={bulkBuylistPricingMode}
+                        onChange={(e) => setBulkBuylistPricingMode(e.target.value as any)}
+                        className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-white"
+                      >
+                        <option value="percent">% wartości Cardmarket EUR (rekomendowane)</option>
+                        <option value="fixed">Stała kwota PLN dla każdej karty</option>
+                        {bulkBuylistInputType === 'csv' && (
+                          <option value="csv">Cena z pliku CSV</option>
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Rate / Amount input */}
+                    {bulkBuylistPricingMode === 'percent' ? (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                          Procent wartości Cardmarket:
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="10"
+                            max="150"
+                            step="5"
+                            value={bulkBuylistPercentRate}
+                            onChange={(e) => setBulkBuylistPercentRate(e.target.value)}
+                            className="w-24 rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
+                          />
+                          <span className="text-xs text-slate-300 font-bold">%</span>
+                          <span className="text-[11px] text-slate-500">
+                            (kurs: {settings.eur_to_pln || '4.30'} zł)
+                          </span>
+                        </div>
+                      </div>
+                    ) : bulkBuylistPricingMode === 'fixed' ? (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                          Stała cena skupu za sztukę (PLN):
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          value={bulkBuylistFixedPrice}
+                          onChange={(e) => setBulkBuylistFixedPrice(e.target.value)}
+                          className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
+                        />
+                      </div>
+                    ) : null}
+
+                    {/* Default Condition */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                        Domyślny minimalny stan:
+                      </label>
+                      <select
+                        value={bulkBuylistMinCondition}
+                        onChange={(e) => setBulkBuylistMinCondition(e.target.value)}
+                        className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-white"
+                      >
+                        <option value="LP">Min. LP (Lightly Played / Excellent)</option>
+                        <option value="NM">Tylko NM (Near Mint)</option>
+                        <option value="MP">Min. MP (Played)</option>
+                        <option value="ANY">Dowolny stan</option>
+                      </select>
+                    </div>
+
+                    {/* Default Foil */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                        Domyślna wersja Foil:
+                      </label>
+                      <select
+                        value={bulkBuylistFoil}
+                        onChange={(e) => setBulkBuylistFoil(e.target.value)}
+                        className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-white"
+                      >
+                        <option value="2">Dowolna (Foil lub Non-foil)</option>
+                        <option value="0">Tylko Non-foil</option>
+                        <option value="1">Tylko Foil ✨</option>
+                      </select>
+                    </div>
+
+                    {/* Default Notes */}
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                        Domyślne uwagi do skupu (opcjonalnie):
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="np. chętnie wezmę cały playset, wersja z retro ramką"
+                        value={bulkBuylistNotes}
+                        onChange={(e) => setBulkBuylistNotes(e.target.value)}
+                        className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-sky-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action button */}
+                <button
+                  type="button"
+                  disabled={bulkBuylistLoading}
+                  onClick={handleBulkBuylistPreview}
+                  className="w-full rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 py-3 font-bold text-xs text-white shadow-lg shadow-sky-600/20 hover:from-sky-500 hover:to-blue-500 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {bulkBuylistLoading ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Pobieranie kart ze Scryfall...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4" />
+                      Pobierz dane ze Scryfall i sprawdź podgląd
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              /* ================= PREVIEW SCREEN ================= */
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <div className="text-xs text-slate-300">
+                    Rozpoznano: <strong className="text-white">{bulkBuylistPreview.length} kart</strong> (łącznie{' '}
+                    <strong className="text-sky-400">
+                      {bulkBuylistPreview.reduce((sum, c) => sum + c.quantity, 0)} sztuk
+                    </strong>
+                    ). Możesz dostosować ceny skupu bezpośrednio w tabeli.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBulkBuylistPreview(null)}
+                    className="text-xs text-sky-400 hover:underline"
+                  >
+                    ← Wróć do edycji listy
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/80 max-h-80">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400">
+                      <tr>
+                        <th className="py-2.5 pl-3 pr-2">Karta</th>
+                        <th className="px-2 py-2.5">Dodatek</th>
+                        <th className="px-2 py-2.5 text-center">Ilość</th>
+                        <th className="px-2 py-2.5">Cardmarket</th>
+                        <th className="px-2 py-2.5">Cena skupu (PLN)</th>
+                        <th className="px-2 py-2.5">Wersja</th>
+                        <th className="py-2.5 pr-3 pl-2 text-right">Usuń</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/50">
+                      {bulkBuylistPreview.map((card, idx) => (
+                        <tr key={idx} className="hover:bg-slate-900/50 transition">
+                          <td className="py-2 pl-3 pr-2">
+                            <div className="flex items-center gap-2">
+                              <div className="h-9 w-6 flex-shrink-0 overflow-hidden rounded bg-slate-900">
+                                {card.image_url ? (
+                                  <img src={card.image_url} alt={card.name} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-[6px] text-slate-600">MTG</div>
+                                )}
+                              </div>
+                              <span className="font-bold text-white truncate max-w-[180px]" title={card.name}>
+                                {card.name}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-2 py-2 font-mono text-[11px] text-slate-400 uppercase">
+                            {card.set_code || '-'} {card.collector_number ? `#${card.collector_number}` : ''}
+                          </td>
+                          <td className="px-2 py-2 text-center font-bold text-slate-200">
+                            {card.quantity} szt.
+                          </td>
+                          <td className="px-2 py-2 text-slate-400 text-[11px]">
+                            {card.market_eur ? `~${card.market_eur.toFixed(2)} €` : '—'}
+                          </td>
+                          <td className="px-2 py-2">
+                            <input
+                              type="number"
+                              step="0.5"
+                              value={card.price_pln}
+                              onChange={(e) =>
+                                handleUpdatePreviewCardPrice(idx, parseFloat(e.target.value) || 0)
+                              }
+                              className="w-20 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs font-bold text-emerald-400 focus:border-sky-500 focus:outline-none"
+                            />
+                            <span className="text-[10px] text-slate-400 ml-1">zł</span>
+                          </td>
+                          <td className="px-2 py-2 text-[11px] text-slate-400">
+                            {card.foil === 1 ? (
+                              <span className="text-amber-300 font-semibold">Foil ✨</span>
+                            ) : card.foil === 0 ? (
+                              'Non-foil'
+                            ) : (
+                              'Dowolna'
+                            )}
+                          </td>
+                          <td className="py-2 pr-3 pl-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePreviewCard(idx)}
+                              className="rounded p-1 text-slate-500 hover:text-red-400"
+                              title="Usuń z listy"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Summary & Confirm Import */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-800">
+                  <div className="text-xs text-slate-400">
+                    Szacowany łączny budżet na te karty:{' '}
+                    <strong className="text-emerald-400 text-sm">
+                      {bulkBuylistPreview
+                        .reduce((sum, c) => sum + c.price_pln * c.quantity, 0)
+                        .toFixed(2)}{' '}
+                      PLN
+                    </strong>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBulkBuylistPreview(null)}
+                      className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white"
+                    >
+                      Anuluj
+                    </button>
+                    <button
+                      type="button"
+                      disabled={bulkBuylistLoading}
+                      onClick={handleBulkBuylistImport}
+                      className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2.5 font-bold text-xs text-white shadow-lg shadow-emerald-600/20 hover:from-emerald-500 hover:to-teal-500 transition disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {bulkBuylistLoading ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Zapisywanie...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4" />
+                          Zatwierdź i zaimportuj {bulkBuylistPreview.length} kart do skupu
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
