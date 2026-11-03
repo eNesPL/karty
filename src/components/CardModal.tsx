@@ -262,53 +262,66 @@ export function CardModal({ card, mode = 'sell', onClose, onAddToCart, onAddToOf
             ) : printings.length === 0 ? (
               <p className="py-4 text-xs text-slate-500">Nie znaleziono innych wydań tej karty.</p>
             ) : (
-              <div className="mt-3 grid max-h-72 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
+              <div
+                className="mt-3 flex max-h-80 gap-3 overflow-x-auto overflow-y-hidden snap-x snap-mandatory pb-3"
+                aria-label="Lista printów — przesuwaj w lewo lub w prawo"
+                style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}
+              >
                 {printings.map((printing) => {
                   const isCurrent = currentPrinting(printing);
                   return (
-                    <div
+                    <article
                       key={printing.id}
-                      className={`flex min-w-0 gap-2 rounded-lg border p-2 ${isCurrent ? 'border-sky-500/70 bg-sky-500/10' : 'border-slate-800 bg-slate-950/60'}`}
+                      className={`flex w-[230px] flex-shrink-0 snap-start flex-col rounded-xl border p-3 ${isCurrent ? 'border-sky-500/70 bg-sky-500/10' : 'border-slate-800 bg-slate-950/60'}`}
                     >
-                      <div className="h-[76px] w-[54px] flex-shrink-0 overflow-hidden rounded bg-slate-900">
-                        {printing.image_url ? (
-                          <button
-                            type="button"
-                            onClick={() => setEnlargedImage({ url: printing.image_url!, alt: `${printing.name} — ${printing.set_name}` })}
-                            className="h-full w-full cursor-zoom-in"
-                            aria-label={`Powiększ print: ${printing.set_name}`}
-                          >
-                            <img
-                              src={printing.image_url}
-                              alt={`${printing.name} — ${printing.set_name}`}
-                              loading="lazy"
-                              className="h-full w-full object-cover"
-                            />
-                          </button>
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-[9px] text-slate-600">MTG</div>
-                        )}
+                      <div className="flex gap-3">
+                        <div className="h-[126px] w-[90px] flex-shrink-0 overflow-hidden rounded-lg bg-slate-900">
+                          {printing.image_url ? (
+                            <button
+                              type="button"
+                              onClick={() => setEnlargedImage({ url: printing.image_url!, alt: `${printing.name} — ${printing.set_name}` })}
+                              className="h-full w-full cursor-zoom-in"
+                              aria-label={`Powiększ print: ${printing.set_name}`}
+                            >
+                              <img
+                                src={printing.image_url}
+                                alt={`${printing.name} — ${printing.set_name}`}
+                                loading="lazy"
+                                className="h-full w-full object-contain"
+                              />
+                            </button>
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-[10px] text-slate-600">MTG</div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Dodatek / edycja</div>
+                          <div className="mt-1 break-words text-xs font-bold leading-snug text-white">
+                            {printing.set_name}
+                          </div>
+                          <div className="mt-2 text-[10px] text-slate-400">
+                            Kod edycji: <strong className="text-slate-200">{printing.set.toUpperCase()}</strong>
+                          </div>
+                          <div className="mt-1 text-[10px] text-slate-400">
+                            Numer karty: <strong className="text-slate-200">#{printing.collector_number}</strong>
+                          </div>
+                          <div className="mt-1 text-[10px] capitalize text-slate-400">
+                            Rzadkość: <strong className="text-slate-200">{printing.rarity || '—'}</strong>
+                          </div>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <div className="line-clamp-2 text-[11px] font-semibold text-slate-200">
-                          {printing.set_name}
-                        </div>
-                        <div className="mt-1 text-[10px] text-slate-400">
-                          {printing.set.toUpperCase()} #{printing.collector_number}
-                        </div>
-                        <div className="mt-1 text-[10px] capitalize text-slate-500">
-                          {printing.rarity || '—'}
-                        </div>
-                        {isCurrent && (
-                          <span className="mt-1 inline-block rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-bold text-sky-300">
-                            Pozycja skupu
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                      {isCurrent && (
+                        <span className="mt-3 self-start rounded bg-sky-500/20 px-2 py-1 text-[9px] font-bold text-sky-300">
+                          Pozycja skupu
+                        </span>
+                      )}
+                    </article>
                   );
                 })}
               </div>
+              <p className="mt-1 text-center text-[10px] text-slate-500 sm:hidden">
+                Przesuń palcem w bok, aby zobaczyć kolejne printy →
+              </p>
             )}
           </section>
         )}
