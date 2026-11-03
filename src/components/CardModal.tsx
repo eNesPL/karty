@@ -21,6 +21,7 @@ export function CardModal({ card, mode = 'sell', onClose, onAddToCart, onAddToOf
   const [printings, setPrintings] = useState<ScryfallCardData[]>([]);
   const [printingsLoading, setPrintingsLoading] = useState(false);
   const [printingsError, setPrintingsError] = useState('');
+  const [enlargedImage, setEnlargedImage] = useState<{ url: string; alt: string } | null>(null);
 
   useEffect(() => {
     if (!buylistCard) {
@@ -83,11 +84,18 @@ export function CardModal({ card, mode = 'sell', onClose, onAddToCart, onAddToOf
         <div className={`grid gap-4 ${isBuylist ? 'sm:grid-cols-[minmax(0,220px)_1fr]' : 'sm:grid-cols-[minmax(0,220px)_1fr]'}`}>
           <div className="relative mx-auto aspect-[5/7] w-full max-w-[220px] overflow-hidden rounded-xl bg-slate-950 shadow-inner">
             {card.image_url ? (
-              <img
-                src={card.image_url}
-                alt={card.name}
-                className="h-full w-full object-contain"
-              />
+              <button
+                type="button"
+                onClick={() => setEnlargedImage({ url: card.image_url!, alt: card.name })}
+                className="h-full w-full cursor-zoom-in"
+                aria-label={`Powiększ ${card.name}`}
+              >
+                <img
+                  src={card.image_url}
+                  alt={card.name}
+                  className="h-full w-full object-contain"
+                />
+              </button>
             ) : (
               <div className="flex h-full w-full items-center justify-center text-slate-500">
                 {card.name}
@@ -186,6 +194,28 @@ export function CardModal({ card, mode = 'sell', onClose, onAddToCart, onAddToOf
           </div>
         </div>
 
+        {enlargedImage && (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 p-4"
+            onClick={() => setEnlargedImage(null)}
+          >
+            <button
+              type="button"
+              onClick={() => setEnlargedImage(null)}
+              className="absolute right-4 top-4 z-10 rounded-full bg-slate-800/90 p-2 text-white hover:bg-slate-700"
+              aria-label="Zamknij powiększenie"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <img
+              src={enlargedImage.url}
+              alt={enlargedImage.alt}
+              onClick={(event) => event.stopPropagation()}
+              className="max-h-[92vh] max-w-[92vw] cursor-zoom-out object-contain"
+            />
+          </div>
+        )}
+
         {isBuylist && (
           <section className="mt-5 border-t border-slate-800 pt-4">
             <div className="flex items-center gap-2">
@@ -242,12 +272,19 @@ export function CardModal({ card, mode = 'sell', onClose, onAddToCart, onAddToOf
                     >
                       <div className="h-[76px] w-[54px] flex-shrink-0 overflow-hidden rounded bg-slate-900">
                         {printing.image_url ? (
-                          <img
-                            src={printing.image_url}
-                            alt={`${printing.name} — ${printing.set_name}`}
-                            loading="lazy"
-                            className="h-full w-full object-cover"
-                          />
+                          <button
+                            type="button"
+                            onClick={() => setEnlargedImage({ url: printing.image_url!, alt: `${printing.name} — ${printing.set_name}` })}
+                            className="h-full w-full cursor-zoom-in"
+                            aria-label={`Powiększ print: ${printing.set_name}`}
+                          >
+                            <img
+                              src={printing.image_url}
+                              alt={`${printing.name} — ${printing.set_name}`}
+                              loading="lazy"
+                              className="h-full w-full object-cover"
+                            />
+                          </button>
                         ) : (
                           <div className="flex h-full items-center justify-center text-[9px] text-slate-600">MTG</div>
                         )}
