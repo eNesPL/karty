@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, BuylistCard } from '@/lib/types';
 import { ScryfallCardData } from '@/lib/scryfall';
-import { X, Sparkles, HandCoins, RefreshCw, Layers } from 'lucide-react';
+import { X, Sparkles, HandCoins, RefreshCw, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface CardModalProps {
   card: Card | BuylistCard | null;
@@ -21,7 +21,7 @@ export function CardModal({ card, mode = 'sell', onClose, onAddToCart, onAddToOf
   const [printings, setPrintings] = useState<ScryfallCardData[]>([]);
   const [printingsLoading, setPrintingsLoading] = useState(false);
   const [printingsError, setPrintingsError] = useState('');
-  const [enlargedImage, setEnlargedImage] = useState<{ url: string; alt: string } | null>(null);
+  const [enlargedImage, setEnlargedImage] = useState<{ url: string; alt: string; printingIndex?: number } | null>(null);
 
   useEffect(() => {
     if (!buylistCard) {
@@ -202,17 +202,58 @@ export function CardModal({ card, mode = 'sell', onClose, onAddToCart, onAddToOf
             <button
               type="button"
               onClick={() => setEnlargedImage(null)}
-              className="absolute right-4 top-4 z-10 rounded-full bg-slate-800/90 p-2 text-white hover:bg-slate-700"
+              className="absolute right-4 top-4 z-20 rounded-full bg-slate-800/90 p-2 text-white hover:bg-slate-700"
               aria-label="Zamknij powiększenie"
             >
               <X className="h-6 w-6" />
             </button>
-            <img
-              src={enlargedImage.url}
-              alt={enlargedImage.alt}
-              onClick={(event) => event.stopPropagation()}
-              className="max-h-[92vh] max-w-[92vw] cursor-zoom-out object-contain"
-            />
+            {enlargedImage.printingIndex !== undefined && printings.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    const nextIndex = (enlargedImage.printingIndex! - 1 + printings.length) % printings.length;
+                    const printing = printings[nextIndex];
+                    setEnlargedImage({ url: printing.image_url || '', alt: `${printing.name} — ${printing.set_name}`, printingIndex: nextIndex });
+                  }}
+                  className="absolute left-2 sm:left-6 z-20 rounded-full bg-slate-800/90 p-2 sm:p-3 text-white hover:bg-slate-700"
+                  aria-label="Poprzedni print"
+                >
+                  <ChevronLeft className="h-7 w-7" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    const nextIndex = (enlargedImage.printingIndex! + 1) % printings.length;
+                    const printing = printings[nextIndex];
+                    setEnlargedImage({ url: printing.image_url || '', alt: `${printing.name} — ${printing.set_name}`, printingIndex: nextIndex });
+                  }}
+                  className="absolute right-2 sm:right-6 z-20 rounded-full bg-slate-800/90 p-2 sm:p-3 text-white hover:bg-slate-700"
+                  aria-label="Następny print"
+                >
+                  <ChevronRight className="h-7 w-7" />
+                </button>
+              </>
+            )}
+            <div className="flex max-h-[92vh] max-w-[92vw] flex-col items-center gap-3" onClick={(event) => event.stopPropagation()}>
+              <img
+                src={enlargedImage.url}
+                alt={enlargedImage.alt}
+                className="max-h-[82vh] max-w-[88vw] cursor-zoom-out object-contain"
+                onClick={() => setEnlargedImage(null)}
+              />
+              {enlargedImage.printingIndex !== undefined && printings[enlargedImage.printingIndex] && (
+                <div className="text-center text-sm text-white">
+                  <div className="font-semibold">{printings[enlargedImage.printingIndex].set_name}</div>
+                  <div className="text-xs text-slate-300">
+                    {printings[enlargedImage.printingIndex].set.toUpperCase()} #{printings[enlargedImage.printingIndex].collector_number}
+                    {' · '}{enlargedImage.printingIndex + 1} / {printings.length}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -263,66 +304,53 @@ export function CardModal({ card, mode = 'sell', onClose, onAddToCart, onAddToOf
               <p className="py-4 text-xs text-slate-500">Nie znaleziono innych wydań tej karty.</p>
             ) : (
               <>
-              <div
-                className="mt-3 flex max-h-80 gap-3 overflow-x-auto overflow-y-hidden snap-x snap-mandatory pb-3"
-                aria-label="Lista printów — przesuwaj w lewo lub w prawo"
-                style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}
-              >
-                {printings.map((printing) => {
+              <div className="mt-3 grid max-h-72 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
+                {printings.map((printing, index) => {
                   const isCurrent = currentPrinting(printing);
                   return (
-                    <article
+                    <div
                       key={printing.id}
-                      className={`flex w-[230px] flex-shrink-0 snap-start flex-col rounded-xl border p-3 ${isCurrent ? 'border-sky-500/70 bg-sky-500/10' : 'border-slate-800 bg-slate-950/60'}`}
+                      className={`flex min-w-0 gap-2 rounded-lg border p-2 ${isCurrent ? 'border-sky-500/70 bg-sky-500/10' : 'border-slate-800 bg-slate-950/60'}`}
                     >
-                      <div className="flex gap-3">
-                        <div className="h-[126px] w-[90px] flex-shrink-0 overflow-hidden rounded-lg bg-slate-900">
-                          {printing.image_url ? (
-                            <button
-                              type="button"
-                              onClick={() => setEnlargedImage({ url: printing.image_url!, alt: `${printing.name} — ${printing.set_name}` })}
-                              className="h-full w-full cursor-zoom-in"
-                              aria-label={`Powiększ print: ${printing.set_name}`}
-                            >
-                              <img
-                                src={printing.image_url}
-                                alt={`${printing.name} — ${printing.set_name}`}
-                                loading="lazy"
-                                className="h-full w-full object-contain"
-                              />
-                            </button>
-                          ) : (
-                            <div className="flex h-full items-center justify-center text-[10px] text-slate-600">MTG</div>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Dodatek / edycja</div>
-                          <div className="mt-1 break-words text-xs font-bold leading-snug text-white">
-                            {printing.set_name}
-                          </div>
-                          <div className="mt-2 text-[10px] text-slate-400">
-                            Kod edycji: <strong className="text-slate-200">{printing.set.toUpperCase()}</strong>
-                          </div>
-                          <div className="mt-1 text-[10px] text-slate-400">
-                            Numer karty: <strong className="text-slate-200">#{printing.collector_number}</strong>
-                          </div>
-                          <div className="mt-1 text-[10px] capitalize text-slate-400">
-                            Rzadkość: <strong className="text-slate-200">{printing.rarity || '—'}</strong>
-                          </div>
-                        </div>
+                      <div className="h-[76px] w-[54px] flex-shrink-0 overflow-hidden rounded bg-slate-900">
+                        {printing.image_url ? (
+                          <button
+                            type="button"
+                            onClick={() => setEnlargedImage({ url: printing.image_url!, alt: `${printing.name} — ${printing.set_name}`, printingIndex: index })}
+                            className="h-full w-full cursor-zoom-in"
+                            aria-label={`Powiększ print: ${printing.set_name}`}
+                          >
+                            <img
+                              src={printing.image_url}
+                              alt={`${printing.name} — ${printing.set_name}`}
+                              loading="lazy"
+                              className="h-full w-full object-cover"
+                            />
+                          </button>
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-[9px] text-slate-600">MTG</div>
+                        )}
                       </div>
-                      {isCurrent && (
-                        <span className="mt-3 self-start rounded bg-sky-500/20 px-2 py-1 text-[9px] font-bold text-sky-300">
-                          Pozycja skupu
-                        </span>
-                      )}
-                    </article>
+                      <div className="min-w-0">
+                        <div className="line-clamp-2 text-[11px] font-semibold text-slate-200">
+                          {printing.set_name}
+                        </div>
+                        <div className="mt-1 text-[10px] text-slate-400">
+                          {printing.set.toUpperCase()} #{printing.collector_number}
+                        </div>
+                        <div className="mt-1 text-[10px] capitalize text-slate-500">
+                          {printing.rarity || '—'}
+                        </div>
+                        {isCurrent && (
+                          <span className="mt-1 inline-block rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-bold text-sky-300">
+                            Pozycja skupu
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   );
                 })}
               </div>
-              <p className="mt-1 text-center text-[10px] text-slate-500 sm:hidden">
-                Przesuń palcem w bok, aby zobaczyć kolejne printy →
-              </p>
               </>
             )}
           </section>
