@@ -49,7 +49,7 @@ export function BuylistCardItem({
           onClick={() => onPreview(card)}
           type="button"
           className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-950/80 text-slate-200 backdrop-blur-sm transition-opacity hover:bg-sky-500 hover:text-slate-950 md:opacity-0 md:group-hover:opacity-100"
-          title="Powiększ kartę"
+          title="Zobacz kartę i inne printy" aria-label="Zobacz kartę i inne printy"
         >
           <Eye className="h-4 w-4" />
         </button>
