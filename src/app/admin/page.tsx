@@ -45,7 +45,8 @@ export default function AdminPage() {
   const [buylistCards, setBuylistCards] = useState<BuylistCard[]>([]);
   const [buylistSearch, setBuylistSearch] = useState('');
   const [buylistLoading, setBuylistLoading] = useState(false);
-  const [editingBuylistCard, setEditingBuylistCard] = useState<BuylistCard | null>(null);\n  const [refreshingBuylistPriceId, setRefreshingBuylistPriceId] = useState<number | null>(null);\n  const [buylistPriceMessages, setBuylistPriceMessages] = useState<Record<number, string>>({});
+  const [editingBuylistCard, setEditingBuylistCard] = useState<BuylistCard | null>(null);
+  const [refreshingBuylistPriceId, setRefreshingBuylistPriceId] = useState<number | null>(null);\n  const [buylistPriceMessages, setBuylistPriceMessages] = useState<Record<number, string>>({});
 
   // Buylist Offers state
   const [buylistOffers, setBuylistOffers] = useState<BuylistOffer[]>([]);
