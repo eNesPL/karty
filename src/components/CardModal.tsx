@@ -262,6 +262,7 @@ export function CardModal({ card, mode = 'sell', onClose, onAddToCart, onAddToOf
             ) : printings.length === 0 ? (
               <p className="py-4 text-xs text-slate-500">Nie znaleziono innych wydań tej karty.</p>
             ) : (
+              <>
               <div
                 className="mt-3 flex max-h-80 gap-3 overflow-x-auto overflow-y-hidden snap-x snap-mandatory pb-3"
                 aria-label="Lista printów — przesuwaj w lewo lub w prawo"
@@ -322,6 +323,7 @@ export function CardModal({ card, mode = 'sell', onClose, onAddToCart, onAddToOf
               <p className="mt-1 text-center text-[10px] text-slate-500 sm:hidden">
                 Przesuń palcem w bok, aby zobaczyć kolejne printy →
               </p>
+              </>
             )}
           </section>
         )}
