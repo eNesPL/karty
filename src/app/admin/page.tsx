@@ -2477,7 +2477,12 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
               </div>
             )}
 
-            {/* Results */}
+            {/* Every matching Scryfall printing across all editions */}
+            {!selectedScryfallCard && scryfallResults.length > 0 && (
+              <div className="text-[10px] text-slate-400">
+                Znaleziono {scryfallResults.length} printów ze wszystkich dostępnych edycji. Wybierz konkretny wariant.
+              </div>
+            )}
             {!selectedScryfallCard && scryfallResults.length > 0 && (
               <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                 {scryfallResults.map((card) => (
@@ -2634,7 +2639,12 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
               </div>
             )}
 
-            {/* Results */}
+            {/* Every matching Scryfall printing across all editions */}
+            {!selectedBuyScryfallCard && buyScryfallResults.length > 0 && (
+              <div className="text-[10px] text-slate-400">
+                Znaleziono {buyScryfallResults.length} printów ze wszystkich dostępnych edycji. Wybierz konkretny wariant.
+              </div>
+            )}
             {!selectedBuyScryfallCard && buyScryfallResults.length > 0 && (
               <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                 {buyScryfallResults.map((card) => (
