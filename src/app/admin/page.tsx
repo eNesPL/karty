@@ -45,7 +45,7 @@ export default function AdminPage() {
   const [buylistCards, setBuylistCards] = useState<BuylistCard[]>([]);
   const [buylistSearch, setBuylistSearch] = useState('');
   const [buylistLoading, setBuylistLoading] = useState(false);
-  const [editingBuylistCard, setEditingBuylistCard] = useState<BuylistCard | null>(null);
+  const [editingBuylistCard, setEditingBuylistCard] = useState<BuylistCard | null>(null);\n  const [refreshingBuylistPriceId, setRefreshingBuylistPriceId] = useState<number | null>(null);\n  const [buylistPriceMessages, setBuylistPriceMessages] = useState<Record<number, string>>({});
 
   // Buylist Offers state
   const [buylistOffers, setBuylistOffers] = useState<BuylistOffer[]>([]);
@@ -375,6 +375,38 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleRefreshBuylistPrice = async (card: BuylistCard) => {
+    if (refreshingBuylistPriceId !== null) return;
+
+    setRefreshingBuylistPriceId(card.id);
+    setBuylistPriceMessages((current) => ({ ...current, [card.id]: '' }));
+
+    try {
+      const res = await fetch(`/api/admin/buylist/${card.id}/refresh-price`, {
+        method: 'POST',
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Nie udało się zaktualizować ceny.');
+      }
+
+      setBuylistPriceMessages((current) => ({
+        ...current,
+        [card.id]: `Nowa cena: ${Number(data.price_pln).toFixed(2)} zł · ${data.printing.set_code.toUpperCase()} #${data.printing.collector_number}`,
+      }));
+      await fetchBuylist();
+    } catch (error) {
+      setBuylistPriceMessages((current) => ({
+        ...current,
+        [card.id]: error instanceof Error ? error.message : 'Nie udało się zaktualizować ceny.',
+      }));
+    } finally {
+      setRefreshingBuylistPriceId(null);
     }
   };
 
@@ -1610,7 +1642,21 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
                           {c.notes || '-'}
                         </td>
                         <td className="py-2.5 pr-4 pl-2 text-right">
+                          {buylistPriceMessages[c.id] && (
+                            <div className="mb-1 max-w-56 text-right text-[10px] text-slate-400" role="status">
+                              {buylistPriceMessages[c.id]}
+                            </div>
+                          )}
                           <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleRefreshBuylistPrice(c)}
+                              disabled={refreshingBuylistPriceId !== null}
+                              className="rounded p-1 text-sky-400 hover:bg-sky-950/60 hover:text-sky-300 disabled:cursor-wait disabled:opacity-40"
+                              title="Zaktualizuj cenę na podstawie najtańszego printu"
+                            >
+                              <RefreshCw className={`h-3.5 w-3.5 ${refreshingBuylistPriceId === c.id ? 'animate-spin' : ''}`} />
+                            </button>
                             <button
                               onClick={() => setEditingBuylistCard(c)}
                               className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
