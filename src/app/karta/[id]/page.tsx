@@ -89,8 +89,8 @@ export default async function CardDetailPage({ params, searchParams }: CardPageP
                 <div className={`mt-1 text-2xl font-black ${isBuylist ? 'text-emerald-400' : 'text-amber-400'}`}>
                   {Number(card.price_pln).toFixed(2)} zł
                 </div>
-                {!isBuylist && card.price_eur != null && (
-                  <div className="mt-1 text-xs text-slate-500">Cardmarket: {Number(card.price_eur).toFixed(2)} €</div>
+                {!isBuylist && (card as Card).price_eur != null && (
+                  <div className="mt-1 text-xs text-slate-500">Cardmarket: {Number((card as Card).price_eur).toFixed(2)} €</div>
                 )}
               </div>
               <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
