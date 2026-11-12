@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Card } from '@/lib/types';
+import Link from 'next/link';
 import { Plus, Minus, Check, Sparkles, Eye } from 'lucide-react';
 
 interface CardItemProps {
@@ -47,18 +48,24 @@ export function CardItem({
 
       {/* Card Image Container */}
       <div className="relative aspect-[5/7] w-full overflow-hidden rounded-lg bg-slate-950">
-        {card.image_url ? (
-          <img
-            src={card.image_url}
-            alt={card.name}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center p-4 text-center text-xs text-slate-500">
-            {card.name}
-          </div>
-        )}
+        <Link
+          href={`/karta/${card.id}`}
+          className="absolute inset-0 block"
+          aria-label={`Otwórz stronę karty ${card.name}`}
+        >
+          {card.image_url ? (
+            <img
+              src={card.image_url}
+              alt={card.name}
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center p-4 text-center text-xs text-slate-500">
+              {card.name}
+            </div>
+          )}
+        </Link>
 
         {/* Quick Zoom Button */}
         <button
@@ -81,7 +88,9 @@ export function CardItem({
         <div>
           <div className="flex items-start justify-between gap-1">
             <h3 className="line-clamp-1 font-semibold text-slate-100 text-sm" title={card.name}>
-              {card.name}
+              <Link href={`/karta/${card.id}`} className="hover:text-amber-300">
+                {card.name}
+              </Link>
             </h3>
           </div>
 
