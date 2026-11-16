@@ -16,10 +16,12 @@ export async function POST(request: Request) {
     const scraperApiUrl = process.env.MTGSPOT_SCRAPER_API_URL?.trim();
     const syncToken = process.env.MTGSPOT_SYNC_TOKEN?.trim();
 
+    let remoteMessage: string | null = null;
+
     if (scraperApiUrl && syncToken) {
       const targetUrl = `${scraperApiUrl.replace(/\/+$/, '')}/api/integrations/karty/sync`;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
       try {
         const res = await fetch(targetUrl, {
           method: 'POST',
@@ -45,6 +47,28 @@ export async function POST(request: Request) {
             { status: 502 }
           );
         }
+
+        try {
+          const scraperJson = (await res.json()) as {
+            status?: string;
+            message?: string;
+            wantlist_fetched?: number;
+            items_checked?: number;
+            offers_found?: number;
+          };
+          if (scraperJson.status === 'already_running') {
+            const checked = scraperJson.items_checked ?? 0;
+            const total = scraperJson.wantlist_fetched ?? 0;
+            const progressStr = total > 0 ? ` (${checked}/${total} poz.)` : '';
+            remoteMessage = `Synchronizacja w tle już trwa w MTGSpot Scraper${progressStr} — dane aktualizują się na bieżąco.`;
+          } else if (scraperJson.status === 'disabled') {
+            remoteMessage = 'Integracja po stronie MTGSpot Scraper jest wyłączona (brak KARTY_API_URL / KARTY_SYNC_TOKEN w scraperze).';
+          } else if (typeof scraperJson.items_checked === 'number') {
+            remoteMessage = `Synchronizacja z MTGSpot Scraper wykonana pomyślnie (sprawdzono ${scraperJson.items_checked} poz., znaleziono ${scraperJson.offers_found ?? 0} ofert).`;
+          }
+        } catch {
+          // ignore JSON parse issues if body is empty
+        }
       } catch (err: unknown) {
         clearTimeout(timeoutId);
         const errMsg = sanitizeIntegrationError(
@@ -66,9 +90,10 @@ export async function POST(request: Request) {
       success: true,
       triggered_remote: Boolean(scraperApiUrl && syncToken),
       message:
-        scraperApiUrl && syncToken
+        remoteMessage ||
+        (scraperApiUrl && syncToken
           ? 'Synchronizacja z MTGSpot Scraper wykonana pomyślnie.'
-          : 'Odświeżono dane ofert. Scraper synchronizuje dane cyklicznie w tle.',
+          : 'Odświeżono dane ofert. Scraper synchronizuje dane cyklicznie w tle.'),
       overview,
     });
   } catch (err: unknown) {
