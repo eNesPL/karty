@@ -26,9 +26,25 @@ import {
   HandCoins,
   RotateCcw,
 } from 'lucide-react';
-import { Card, Reservation, BuylistCard, BuylistOffer } from '@/lib/types';
+import {
+  Card,
+  Reservation,
+  BuylistCard,
+  BuylistOffer,
+  MtgspotScrapedOffer,
+  MtgspotSyncStatus,
+} from '@/lib/types';
 import { BuylistBulkPreviewItem } from '@/lib/buylist_bulk';
 import Link from 'next/link';
+
+interface AdminMtgspotBuylistGroup {
+  buylist_card: BuylistCard;
+  target_price: number;
+  total_offers_count: number;
+  available_offers_count: number;
+  cheapest_available_offer: MtgspotScrapedOffer | null;
+  offers: MtgspotScrapedOffer[];
+}
 
 export default function AdminPage() {
   const [password, setPassword] = useState('');
@@ -46,12 +62,32 @@ export default function AdminPage() {
   const [buylistSearch, setBuylistSearch] = useState('');
   const [buylistLoading, setBuylistLoading] = useState(false);
   const [editingBuylistCard, setEditingBuylistCard] = useState<BuylistCard | null>(null);
-  const [refreshingBuylistPriceId, setRefreshingBuylistPriceId] = useState<number | null>(null);\n  const [buylistPriceMessages, setBuylistPriceMessages] = useState<Record<number, string>>({});
+  const [refreshingBuylistPriceId, setRefreshingBuylistPriceId] = useState<number | null>(null);
+  const [buylistPriceMessages, setBuylistPriceMessages] = useState<Record<number, string>>({});
 
-  // Buylist Offers state
+  // Buylist Offers state (Player offers + MTGSpot scraped offers)
   const [buylistOffers, setBuylistOffers] = useState<BuylistOffer[]>([]);
   const [offerFilter, setOfferFilter] = useState<'all' | 'pending' | 'accepted' | 'completed' | 'rejected'>('pending');
   const [offersLoading, setOffersLoading] = useState(false);
+
+  const [mtgspotGroups, setMtgspotGroups] = useState<AdminMtgspotBuylistGroup[]>([]);
+  const [mtgspotSyncStatus, setMtgspotSyncStatus] = useState<MtgspotSyncStatus>({
+    status: 'idle',
+    last_success_at: null,
+    last_attempt_at: null,
+    last_items_processed: 0,
+    last_offers_processed: 0,
+    last_error: null,
+    total_offers: 0,
+    available_offers: 0,
+  });
+  const [mtgspotLoading, setMtgspotLoading] = useState(false);
+  const [mtgspotSyncing, setMtgspotSyncing] = useState(false);
+  const [mtgspotSyncFeedback, setMtgspotSyncFeedback] = useState<string | null>(null);
+  const [mtgspotCardFilter, setMtgspotCardFilter] = useState('');
+  const [mtgspotSelectedCardId, setMtgspotSelectedCardId] = useState<string>('all');
+  const [mtgspotAvailabilityFilter, setMtgspotAvailabilityFilter] = useState<'all' | 'available' | 'unavailable'>('available');
+  const [mtgspotSortOrder, setMtgspotSortOrder] = useState<'price_asc' | 'price_desc'>('price_asc');
 
   // Add Card to Buylist state
   const [isAddBuylistModalOpen, setIsAddBuylistModalOpen] = useState(false);
@@ -189,6 +225,7 @@ export default function AdminPage() {
     fetchInventory();
     fetchBuylist();
     fetchBuylistOffers();
+    fetchMtgspotOffers();
     fetchAdminSettings();
 
     if (typeof window !== 'undefined') {
@@ -547,6 +584,59 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // MTGSpot Buylist Offers Fetch & Manual Sync
+  const fetchMtgspotOffers = async () => {
+    setMtgspotLoading(true);
+    try {
+      const res = await fetch('/api/admin/buylist/mtgspot-offers', {
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.items)) {
+          setMtgspotGroups(data.items);
+        }
+        if (data.sync_status) {
+          setMtgspotSyncStatus(data.sync_status);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setMtgspotLoading(false);
+    }
+  };
+
+  const handleManualMtgspotSync = async () => {
+    setMtgspotSyncing(true);
+    setMtgspotSyncFeedback(null);
+    try {
+      const res = await fetch('/api/admin/buylist/mtgspot-sync', {
+        method: 'POST',
+        headers: { 'x-admin-password': password, 'x-admin-pin': password },
+      });
+      const data = await res.json();
+      if (data.overview) {
+        if (Array.isArray(data.overview.items)) {
+          setMtgspotGroups(data.overview.items);
+        }
+        if (data.overview.sync_status) {
+          setMtgspotSyncStatus(data.overview.sync_status);
+        }
+      }
+      if (!res.ok) {
+        setMtgspotSyncFeedback(`Błąd: ${data.error || 'Nie udało się wykonać synchronizacji.'}`);
+      } else {
+        setMtgspotSyncFeedback(data.message || 'Zaktualizowano oferty MTGSpot.');
+      }
+    } catch (err) {
+      console.error(err);
+      setMtgspotSyncFeedback('Błąd połączenia z serwerem podczas synchronizacji.');
+    } finally {
+      setMtgspotSyncing(false);
     }
   };
 
@@ -1683,22 +1773,458 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
           </div>
         )}
 
-        {/* ================= TAB: BUYLIST OFFERS (OFERTY OD GRACZY) ================= */}
+        {/* ================= TAB: BUYLIST OFFERS (MTGSPOT & OFERTY OD GRACZY) ================= */}
         {activeTab === 'buylist_offers' && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Package className="h-5 w-5 text-sky-400" />
-                  Otrzymane Oferty Skupu
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Gracze, którzy zgłosili chęć przyniesienia i sprzedaży kart z Twojej listy skupu.
-                </p>
+          <div className="space-y-8">
+            {/* ---- SECTION 1: MTGSpot Scraped Offers ---- */}
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-sky-400" />
+                    Oferty skupu — Monitoring MTGSpot
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Zestawienie pozycji buylisty z aktualnymi ofertami znalezionymi w MTGSpot. Wyłącznie podgląd — brak automatycznych zakupów.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={fetchMtgspotOffers}
+                    disabled={mtgspotLoading || mtgspotSyncing}
+                    className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800 transition disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${mtgspotLoading ? 'animate-spin' : ''}`} />
+                    Odśwież widok
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleManualMtgspotSync}
+                    disabled={mtgspotSyncing}
+                    className="flex items-center gap-1.5 rounded-xl bg-sky-500 px-3.5 py-2 text-xs font-bold text-slate-950 hover:bg-sky-400 transition disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${mtgspotSyncing ? 'animate-spin' : ''}`} />
+                    {mtgspotSyncing ? 'Synchronizacja...' : 'Synchronizuj teraz'}
+                  </button>
+                </div>
               </div>
 
-              {/* Status filter */}
-              <div className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 p-1 text-xs">
+              {/* Sync Status Card */}
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 text-xs space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 font-semibold">Status integracji MTGSpot:</span>
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
+                        mtgspotSyncStatus.status === 'ok'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : mtgspotSyncStatus.status === 'partial'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : mtgspotSyncStatus.status === 'error'
+                          ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {mtgspotSyncStatus.status === 'ok'
+                        ? 'Aktywna (OK)'
+                        : mtgspotSyncStatus.status === 'partial'
+                        ? 'Częściowa'
+                        : mtgspotSyncStatus.status === 'error'
+                        ? 'Błąd'
+                        : 'Oczekuje na synchronizację'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-400">
+                    <span>
+                      Ostatnia poprawna synchronizacja:{' '}
+                      <strong className="text-slate-200">
+                        {mtgspotSyncStatus.last_success_at
+                          ? new Date(mtgspotSyncStatus.last_success_at).toLocaleString('pl-PL')
+                          : 'Brak'}
+                      </strong>
+                    </span>
+                    <span>
+                      Ostatnia próba:{' '}
+                      <strong className="text-slate-200">
+                        {mtgspotSyncStatus.last_attempt_at
+                          ? new Date(mtgspotSyncStatus.last_attempt_at).toLocaleString('pl-PL')
+                          : 'Brak'}
+                      </strong>
+                    </span>
+                    <span>
+                      Przetworzono:{' '}
+                      <strong className="text-sky-400">
+                        {mtgspotSyncStatus.last_items_processed} poz. / {mtgspotSyncStatus.last_offers_processed} ofert
+                      </strong>
+                    </span>
+                  </div>
+                </div>
+
+                {mtgspotSyncStatus.last_error && (
+                  <div className="rounded-lg border border-red-800/80 bg-red-950/50 p-2.5 text-xs text-red-300 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+                    <span>
+                      <strong>Ostatni błąd synchronizacji:</strong> {mtgspotSyncStatus.last_error}
+                    </span>
+                  </div>
+                )}
+
+                {mtgspotSyncFeedback && (
+                  <div className="rounded-lg border border-sky-800/60 bg-sky-950/40 p-2 text-xs text-sky-300">
+                    {mtgspotSyncFeedback}
+                  </div>
+                )}
+              </div>
+
+              {/* Filters & Sorting Bar for MTGSpot Offers */}
+              <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-slate-800 bg-slate-900/70 p-3 text-xs">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute top-2.5 left-3 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Filtruj po nazwie karty lub dodatku..."
+                    value={mtgspotCardFilter}
+                    onChange={(e) => setMtgspotCardFilter(e.target.value)}
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-1.5 pr-3 pl-8 text-xs text-slate-100 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+
+                <select
+                  value={mtgspotSelectedCardId}
+                  onChange={(e) => setMtgspotSelectedCardId(e.target.value)}
+                  className="rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="all">Karta buylisty: Wszystkie ({mtgspotGroups.length})</option>
+                  {mtgspotGroups.map((g) => (
+                    <option key={g.buylist_card.id} value={String(g.buylist_card.id)}>
+                      {g.buylist_card.name} ({g.buylist_card.set_code?.toUpperCase() || 'Dowolny'}) — {g.available_offers_count} dost.
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={mtgspotAvailabilityFilter}
+                  onChange={(e) =>
+                    setMtgspotAvailabilityFilter(e.target.value as 'all' | 'available' | 'unavailable')
+                  }
+                  className="rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="available">Dostępność: Tylko dostępne</option>
+                  <option value="unavailable">Dostępność: Tylko niedostępne</option>
+                  <option value="all">Dostępność: Wszystkie (dostępne i archiwalne)</option>
+                </select>
+
+                <select
+                  value={mtgspotSortOrder}
+                  onChange={(e) => setMtgspotSortOrder(e.target.value as 'price_asc' | 'price_desc')}
+                  className="rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="price_asc">Sortuj oferty: Cena rosnąco (najtańsze)</option>
+                  <option value="price_desc">Sortuj oferty: Cena malejąco (najdroższe)</option>
+                </select>
+              </div>
+
+              {/* Buylist Items & Matching MTGSpot Offers */}
+              {mtgspotLoading ? (
+                <div className="py-10 text-center text-slate-500">
+                  <RefreshCw className="h-6 w-6 animate-spin mx-auto text-sky-400" />
+                  <p className="mt-2 text-xs">Ładowanie ofert MTGSpot...</p>
+                </div>
+              ) : mtgspotGroups.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-800 py-10 text-center text-slate-500 text-xs">
+                  Brak pozycji na liście skupu.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {mtgspotGroups
+                    .filter((group) => {
+                      if (
+                        mtgspotSelectedCardId !== 'all' &&
+                        String(group.buylist_card.id) !== mtgspotSelectedCardId
+                      ) {
+                        return false;
+                      }
+                      if (mtgspotCardFilter.trim()) {
+                        const q = mtgspotCardFilter.trim().toLowerCase();
+                        const nameMatch = group.buylist_card.name.toLowerCase().includes(q);
+                        const setMatch =
+                          (group.buylist_card.set_name || '').toLowerCase().includes(q) ||
+                          (group.buylist_card.set_code || '').toLowerCase().includes(q);
+                        if (!nameMatch && !setMatch) return false;
+                      }
+                      return true;
+                    })
+                    .map((group) => {
+                      const card = group.buylist_card;
+                      const targetPrice = group.target_price;
+                      const cheapest = group.cheapest_available_offer;
+                      const filteredOffers = [...group.offers]
+                        .filter((o) => {
+                          if (mtgspotAvailabilityFilter === 'available') {
+                            return o.is_available === 1 && o.stock > 0;
+                          }
+                          if (mtgspotAvailabilityFilter === 'unavailable') {
+                            return o.is_available === 0 || o.stock <= 0;
+                          }
+                          return true;
+                        })
+                        .sort((a, b) =>
+                          mtgspotSortOrder === 'price_asc' ? a.price - b.price : b.price - a.price
+                        );
+
+                      const cheapestDiff = cheapest ? cheapest.price - targetPrice : null;
+
+                      return (
+                        <div
+                          key={card.id}
+                          className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 sm:p-5 shadow-lg space-y-3"
+                        >
+                          {/* Buylist Item Header */}
+                          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                            <div className="flex items-center gap-3">
+                              {card.image_url && (
+                                <img
+                                  src={card.image_url}
+                                  alt={card.name}
+                                  className="h-12 w-9 rounded object-cover shrink-0"
+                                />
+                              )}
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-base font-bold text-white">{card.name}</span>
+                                  <span className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-slate-300 uppercase">
+                                    {card.set_name || card.set_code || 'Dowolny dodatek'}
+                                    {card.collector_number ? ` #${card.collector_number}` : ''}
+                                  </span>
+                                  <span className="rounded bg-sky-950/70 border border-sky-800/50 px-1.5 py-0.5 text-[10px] text-sky-300">
+                                    Min. {card.min_condition || 'LP'}
+                                  </span>
+                                  <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
+                                    {card.foil === 1
+                                      ? 'Tylko Foil ✨'
+                                      : card.foil === 0
+                                      ? 'Tylko Non-foil'
+                                      : 'Foil / Non-foil'}
+                                  </span>
+                                  <span className="text-[11px] text-slate-400">
+                                    Poszukiwana ilość: <strong className="text-slate-200">{card.quantity} szt.</strong>
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Target Price vs Cheapest MTGSpot Offer Comparison */}
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div className="rounded-xl border border-sky-500/30 bg-sky-950/30 px-3 py-1.5 text-right">
+                                <div className="text-[10px] uppercase tracking-wider text-sky-300 font-semibold">
+                                  Cena docelowa (Twój skup)
+                                </div>
+                                <div className="text-sm font-black text-sky-400">
+                                  {targetPrice.toFixed(2)} PLN
+                                </div>
+                              </div>
+
+                              <div className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-1.5 text-right">
+                                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                                  Znalezione oferty
+                                </div>
+                                <div className="text-sm font-bold text-white">
+                                  {group.available_offers_count} dost.{' '}
+                                  <span className="text-[11px] font-normal text-slate-400">
+                                    ({group.total_offers_count} łącznie)
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div
+                                className={`rounded-xl border px-3 py-1.5 text-right ${
+                                  !cheapest
+                                    ? 'border-slate-800 bg-slate-950'
+                                    : cheapest.price <= targetPrice
+                                    ? 'border-emerald-500/40 bg-emerald-950/30'
+                                    : 'border-amber-500/40 bg-amber-950/20'
+                                }`}
+                              >
+                                <div className="text-[10px] uppercase tracking-wider text-slate-300 font-semibold">
+                                  Najtańsza dostępna oferta MTGSpot
+                                </div>
+                                {cheapest ? (
+                                  <div className="flex items-center justify-end gap-2">
+                                    <span
+                                      className={`text-sm font-black ${
+                                        cheapest.price <= targetPrice
+                                          ? 'text-emerald-400'
+                                          : 'text-amber-400'
+                                      }`}
+                                    >
+                                      {cheapest.price.toFixed(2)} PLN
+                                    </span>
+                                    {cheapestDiff !== null && (
+                                      <span
+                                        className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                                          cheapestDiff <= 0
+                                            ? 'bg-emerald-500/20 text-emerald-300'
+                                            : 'bg-amber-500/20 text-amber-300'
+                                        }`}
+                                      >
+                                        {cheapestDiff <= 0
+                                          ? `${cheapestDiff.toFixed(2)} PLN vs cel`
+                                          : `+${cheapestDiff.toFixed(2)} PLN vs cel`}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="text-xs font-semibold text-slate-500">
+                                    Brak dostępnych
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Offers Table for this Buylist Card */}
+                          {filteredOffers.length === 0 ? (
+                            <div className="py-3 text-center text-xs text-slate-500">
+                              Brak ofert MTGSpot spełniających wybrane kryteria filtrowania dla tej karty.
+                            </div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs">
+                                <thead>
+                                  <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                                    <th className="py-2 pr-2">Oferta w MTGSpot</th>
+                                    <th className="px-2 py-2">Dodatek / Edycja</th>
+                                    <th className="px-2 py-2">Stan</th>
+                                    <th className="px-2 py-2">Foil</th>
+                                    <th className="px-2 py-2 text-center">Stock</th>
+                                    <th className="px-2 py-2 text-center">Dostępność</th>
+                                    <th className="px-2 py-2 text-right">Cena oferty MTGSpot</th>
+                                    <th className="px-2 py-2 text-right">Porównanie z celem</th>
+                                    <th className="px-2 py-2">Ostatnia aktualizacja</th>
+                                    <th className="py-2 pl-2 text-right">Link</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                  {filteredOffers.map((offer) => {
+                                    const isAvailable = offer.is_available === 1 && offer.stock > 0;
+                                    const diff = offer.price - targetPrice;
+                                    return (
+                                      <tr
+                                        key={offer.id}
+                                        className={`transition ${
+                                          isAvailable
+                                            ? 'hover:bg-slate-800/40'
+                                            : 'opacity-60 bg-slate-950/40'
+                                        }`}
+                                      >
+                                        <td className="py-2 pr-2">
+                                          <div className="font-semibold text-slate-200">
+                                            {offer.card_name}
+                                          </div>
+                                          {offer.requires_verification === 1 && (
+                                            <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
+                                              <AlertCircle className="h-3 w-3" />
+                                              {offer.verification_note || 'Wymaga weryfikacji printu'}
+                                            </div>
+                                          )}
+                                        </td>
+                                        <td className="px-2 py-2 text-slate-300">
+                                          {offer.expansion || '-'}
+                                        </td>
+                                        <td className="px-2 py-2">
+                                          <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold text-slate-200">
+                                            {offer.condition || '-'}
+                                          </span>
+                                        </td>
+                                        <td className="px-2 py-2">
+                                          {offer.is_foil === 1 ? (
+                                            <span className="text-amber-400 font-semibold">
+                                              ✨ Foil
+                                            </span>
+                                          ) : (
+                                            <span className="text-slate-400">Non-foil</span>
+                                          )}
+                                        </td>
+                                        <td className="px-2 py-2 text-center font-bold text-slate-200">
+                                          {offer.stock} szt.
+                                        </td>
+                                        <td className="px-2 py-2 text-center">
+                                          {isAvailable ? (
+                                            <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                                              Dostępna
+                                            </span>
+                                          ) : (
+                                            <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300">
+                                              Niedostępna
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="px-2 py-2 text-right font-bold text-white">
+                                          {offer.price.toFixed(2)} PLN
+                                        </td>
+                                        <td className="px-2 py-2 text-right">
+                                          <span
+                                            className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                                              diff <= 0
+                                                ? 'bg-emerald-500/20 text-emerald-300'
+                                                : 'bg-amber-500/20 text-amber-300'
+                                            }`}
+                                          >
+                                            {diff <= 0
+                                              ? `${diff.toFixed(2)} PLN (≤ cel ${targetPrice.toFixed(2)} zł)`
+                                              : `+${diff.toFixed(2)} PLN (> cel ${targetPrice.toFixed(2)} zł)`}
+                                          </span>
+                                        </td>
+                                        <td className="px-2 py-2 text-[11px] text-slate-400">
+                                          {new Date(offer.updated_at || offer.scraped_at).toLocaleString('pl-PL')}
+                                        </td>
+                                        <td className="py-2 pl-2 text-right">
+                                          {offer.card_url ? (
+                                            <a
+                                              href={offer.card_url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center gap-1 rounded-lg bg-sky-600/20 border border-sky-500/40 px-2.5 py-1 text-[11px] font-semibold text-sky-300 hover:bg-sky-600/30 transition"
+                                            >
+                                              MTGSpot
+                                              <ExternalLink className="h-3 w-3" />
+                                            </a>
+                                          ) : (
+                                            <span className="text-slate-600">—</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+
+            {/* ---- SECTION 2: Player-Submitted Buylist Offers ---- */}
+            <div className="space-y-4 border-t border-slate-800 pt-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Package className="h-5 w-5 text-sky-400" />
+                    Otrzymane Oferty Skupu od Graczy
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Gracze, którzy zgłosili chęć przyniesienia i sprzedaży kart z Twojej listy skupu.
+                  </p>
+                </div>
+
+                {/* Status filter */}
+                <div className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 p-1 text-xs">
                 <button
                   onClick={() => setOfferFilter('pending')}
                   className={`rounded px-2.5 py-1 font-medium transition ${
@@ -1892,6 +2418,7 @@ Lightning Bolt,clb,Commander Legends: Battle for Baldur's Gate,187,normal,common
                   ))}
               </div>
             )}
+            </div>
           </div>
         )}
 

@@ -3,19 +3,40 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 let dbInstance: DatabaseSync | null = null;
+let currentDbPath: string | null = null;
+
+export function resetDbInstance(): void {
+  if (dbInstance) {
+    try {
+      dbInstance.close();
+    } catch {
+      // ignore close errors
+    }
+    dbInstance = null;
+    currentDbPath = null;
+  }
+}
 
 export function getDb(): DatabaseSync {
-  if (dbInstance) {
+  const configuredPath = process.env.KARTY_DB_PATH
+    ? path.resolve(process.env.KARTY_DB_PATH)
+    : path.join(process.cwd(), 'data', 'karty.db');
+
+  if (dbInstance && currentDbPath === configuredPath) {
     return dbInstance;
   }
 
-  const dbDir = path.join(process.cwd(), 'data');
+  if (dbInstance && currentDbPath !== configuredPath) {
+    resetDbInstance();
+  }
+
+  const dbDir = path.dirname(configuredPath);
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
 
-  const dbPath = path.join(dbDir, 'karty.db');
-  const db = new DatabaseSync(dbPath);
+  const db = new DatabaseSync(configuredPath);
+  currentDbPath = configuredPath;
 
   // Enable WAL mode for better concurrency and performance
   db.exec('PRAGMA journal_mode = WAL;');
@@ -98,6 +119,7 @@ export function getDb(): DatabaseSync {
       language TEXT DEFAULT 'en',
       price_pln REAL NOT NULL,
       quantity INTEGER NOT NULL DEFAULT 1,
+      active INTEGER NOT NULL DEFAULT 1,
       notes TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
@@ -126,7 +148,67 @@ export function getDb(): DatabaseSync {
       foil INTEGER DEFAULT 0,
       condition TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS mtgspot_buylist_offers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      buylist_item_id INTEGER NOT NULL REFERENCES buylist_cards(id) ON DELETE CASCADE,
+      external_id TEXT NOT NULL,
+      card_name TEXT NOT NULL,
+      price REAL NOT NULL,
+      stock INTEGER NOT NULL DEFAULT 0,
+      condition TEXT,
+      is_foil INTEGER NOT NULL DEFAULT 0,
+      expansion TEXT,
+      card_url TEXT,
+      image_url TEXT,
+      language TEXT,
+      is_available INTEGER NOT NULL DEFAULT 1,
+      requires_verification INTEGER NOT NULL DEFAULT 0,
+      verification_note TEXT,
+      scraped_at TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(buylist_item_id, external_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_mtgspot_offers_buylist_id ON mtgspot_buylist_offers(buylist_item_id);
+    CREATE INDEX IF NOT EXISTS idx_mtgspot_offers_available ON mtgspot_buylist_offers(is_available);
+    CREATE INDEX IF NOT EXISTS idx_mtgspot_offers_price ON mtgspot_buylist_offers(price);
+
+    CREATE TABLE IF NOT EXISTS mtgspot_sync_status (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      status TEXT NOT NULL DEFAULT 'idle',
+      last_success_at TEXT,
+      last_attempt_at TEXT,
+      last_items_processed INTEGER NOT NULL DEFAULT 0,
+      last_offers_processed INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT
+    );
+
+    INSERT OR IGNORE INTO mtgspot_sync_status (id, status, last_items_processed, last_offers_processed)
+    VALUES (1, 'idle', 0, 0);
   `);
+
+  // Safe migration for existing databases: ensure `active` column exists on `buylist_cards`
+  const buylistCols = db.prepare('PRAGMA table_info(buylist_cards)').all() as Array<{ name: string }>;
+  if (!buylistCols.some((c) => c.name === 'active')) {
+    db.exec('ALTER TABLE buylist_cards ADD COLUMN active INTEGER NOT NULL DEFAULT 1;');
+  }
+
+  // Safe migration for `mtgspot_buylist_offers` optional columns if upgrading from an older schema
+  const offerCols = db.prepare('PRAGMA table_info(mtgspot_buylist_offers)').all() as Array<{ name: string }>;
+  if (!offerCols.some((c) => c.name === 'requires_verification')) {
+    db.exec('ALTER TABLE mtgspot_buylist_offers ADD COLUMN requires_verification INTEGER NOT NULL DEFAULT 0;');
+  }
+  if (!offerCols.some((c) => c.name === 'verification_note')) {
+    db.exec('ALTER TABLE mtgspot_buylist_offers ADD COLUMN verification_note TEXT;');
+  }
+  if (!offerCols.some((c) => c.name === 'image_url')) {
+    db.exec('ALTER TABLE mtgspot_buylist_offers ADD COLUMN image_url TEXT;');
+  }
+  if (!offerCols.some((c) => c.name === 'language')) {
+    db.exec('ALTER TABLE mtgspot_buylist_offers ADD COLUMN language TEXT;');
+  }
 
   // Seed sample buylist cards if empty
   const countBuylist = db.prepare('SELECT COUNT(*) as count FROM buylist_cards').get() as { count: number } | undefined;

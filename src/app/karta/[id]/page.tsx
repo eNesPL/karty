@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Sparkles } from 'lucide-react';
@@ -9,7 +10,21 @@ type CardPageProps = {
   searchParams: Promise<{ typ?: string }>;
 };
 
-export default async function CardDetailPage({ params, searchParams }: CardPageProps) {
+export default function CardDetailPage(props: CardPageProps) {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-950 px-4 py-6 text-slate-400 sm:px-6">
+          <div className="mx-auto max-w-5xl py-12 text-center text-sm">Ładowanie karty...</div>
+        </main>
+      }
+    >
+      <CardDetailContent {...props} />
+    </Suspense>
+  );
+}
+
+async function CardDetailContent({ params, searchParams }: CardPageProps) {
   const { id: rawId } = await params;
   const { typ } = await searchParams;
   const id = Number(rawId);

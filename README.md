@@ -78,3 +78,21 @@ Aby kod QR działał z dowolnego telefonu bez bycia w tym samym Wi-Fi, możesz w
    * Projekt to standardowy **Next.js (App Router)** z bazą danych w SQLite (`data/karty.db`).
    * Jeśli wrzucasz na VPS lub Render/Railway z dyskiem persistent: wystarczy `pnpm build && pnpm start`.
    * Jeśli używasz darmowego tunelu do testów na żywo: możesz użyć np. `ngrok http 3000` lub `cloudflared tunnel`.
+
+---
+
+## 🔗 Integracja z MTGSpot Scraper (Monitoring ofert dla skupu)
+
+Aplikacja `karty` pełni rolę **źródła prawdy dla buylisty (skupu)** i udostępnia dedykowane endpointy integracyjne dla serwisu `eNesPL/mtgspot-scraper`. Integracja ma charakter wyłącznie **informacyjno-monitoringowy** (wyszukuje i prezentuje dopasowane oferty z MTGSpot w zakładce `Oferty skupu` w panelu `/admin`, bez automatycznego zakupu czy rezerwacji).
+
+### Zmienne środowiskowe (`karty`)
+Skopiuj `.env.example` do `.env.local` i skonfiguruj:
+* `MTGSPOT_SYNC_TOKEN` — wspólny, losowy token autoryzacyjny (min. 8 znaków), identyczny z `KARTY_SYNC_TOKEN` w serwisie `mtgspot-scraper`. Nie używaj tutaj hasła administratora (`admin_password`).
+* `MTGSPOT_SCRAPER_API_URL` *(opcjonalnie)* — adres URL serwisu `mtgspot-scraper` (np. `http://localhost:8000`), pozwalający ręcznie wyzwolić pełny cykl synchronizacji przyciskiem w panelu `/admin`.
+* `KARTY_ALLOW_HTTP=true` *(opcjonalnie)* — zezwala na komunikację po HTTP w sieci wewnętrznej przy `NODE_ENV=production`.
+
+### Endpointy integracyjne (chronione nagłówkiem `Authorization: Bearer <MTGSPOT_SYNC_TOKEN>`)
+* `GET /api/integrations/mtgspot/wantlist` — zwraca aktywne pozycje buylisty (`buylist_cards` z `active = 1` oraz `quantity > 0`), z rozdzieleniem ceny docelowej (`target_price`) od ceny ofertowej.
+* `POST /api/integrations/mtgspot/offers` — przyjmuje paczkę dopasowanych ofert z `mtgspot-scraper`, wykonuje idempotentny upsert po `(buylist_item_id, external_id)` i oznacza wcześniejsze oferty jako niedostępne (`is_available = 0`, `stock = 0`) wyłącznie dla kart, których skan na MTGSpot zakończył się pełnym sukcesem (`synced_buylist_item_ids`).
+* `GET /api/integrations/mtgspot/status` — zwraca status ostatniej synchronizacji, liczniki ofert, czas ostatniej próby/sukcesu oraz ewentualny komunikat błędu.
+

@@ -78,8 +78,57 @@ export interface BuylistCard {
   language: string;
   price_pln: number; // cena skupu oferowana przez właściciela
   quantity: number; // poszukiwana ilość
+  active?: number; // 1 = aktywna, 0 = nieaktywna
   notes?: string | null;
   created_at?: string;
+}
+
+export interface MtgspotWantlistItem {
+  id: number;
+  card_name: string;
+  target_price: number;
+  quantity: number;
+  condition: string | null;
+  is_foil: boolean | null;
+  expansion: string | null;
+  active: boolean;
+  set_code: string | null;
+  set_name: string | null;
+  collector_number: string | null;
+  scryfall_id: string | null;
+  language: string | null;
+}
+
+export interface MtgspotScrapedOffer {
+  id: number;
+  buylist_item_id: number;
+  external_id: string;
+  card_name: string;
+  price: number;
+  stock: number;
+  condition: string | null;
+  is_foil: number; // 0 or 1
+  expansion: string | null;
+  card_url: string | null;
+  image_url?: string | null;
+  language?: string | null;
+  is_available: number; // 1 = available, 0 = unavailable
+  requires_verification: number; // 0 or 1
+  verification_note?: string | null;
+  scraped_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MtgspotSyncStatus {
+  status: 'idle' | 'ok' | 'partial' | 'error';
+  last_success_at: string | null;
+  last_attempt_at: string | null;
+  last_items_processed: number;
+  last_offers_processed: number;
+  last_error: string | null;
+  total_offers?: number;
+  available_offers?: number;
 }
 
 export interface BuylistOfferItem {
